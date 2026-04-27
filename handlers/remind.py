@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes, Application
 from database.reminders import create_reminder, get_pending_reminders, mark_reminder_sent
 from database.users import update_user_query_count
 from utils.validators import extract_team_from_args
+from utils.reply import safe_reply, safe_send
 from utils.logger import setup_logger
 
 log = setup_logger("handler.remind")
@@ -21,7 +22,6 @@ async def remind_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     log.info(f"/remind from {user.id} | args: {args}")
 
-    # Track query
     try:
         update_user_query_count(user.id)
     except Exception:
@@ -35,7 +35,6 @@ async def remind_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             parse_mode="Markdown")
         return
 
-    # Resolve team name
     team_name = extract_team_from_args(args)
 
     if not team_name:
@@ -46,9 +45,7 @@ async def remind_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
 
-    # Set reminder (30 minutes before next expected match)
-    # For MVP: set a generic reminder for the near future
-    remind_time = datetime.utcnow() + timedelta(hours=2)  # Placeholder
+    remind_time = datetime.utcnow() + timedelta(hours=2)
 
     try:
         success = create_reminder(
@@ -63,8 +60,7 @@ async def remind_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 f"_Reminder check hota hai har 30 min mein_",
                 parse_mode="Markdown")
         else:
-            await safe_reply(update, "😕 Reminder set karne mein problem aayi. Thodi der mein try karo!"
-            )
+            await safe_reply(update, "😕 Reminder set karne mein problem aayi. Thodi der mein try karo!")
 
     except Exception as e:
         log.error(f"Remind error for {user.id}: {e}")
@@ -92,7 +88,8 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
             reminder_id = reminder.get("id")
 
             try:
-                await context.bot.send_message(
+                await safe_send(
+                    context.bot,
                     chat_id=telegram_id,
                     text=(
                         f"🔔 **Match Reminder!**\n\n"
@@ -115,31 +112,13 @@ async def check_and_send_reminders(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 def setup_reminder_job(app: Application) -> None:
-    """
-    Register the periodic reminder check job.
-    
-    Args:
-        app: Telegram Application instance
-    """
+    """Register the periodic reminder check job."""
     from config.settings import REMINDER_CHECK_INTERVAL
 
-from telegram.error import BadRequest
-async def safe_reply(update, text, **kwargs):
-    try:
-        await update.message.reply_text(text, **kwargs)
-    except BadRequest as e:
-        if "parse entities" in str(e).lower():
-            # Fallback without markdown
-            kwargs.pop("parse_mode", None)
-            await update.message.reply_text(text, **kwargs)
-        else:
-            raise e
-
-    # Run every REMINDER_CHECK_INTERVAL minutes
     app.job_queue.run_repeating(
         check_and_send_reminders,
-        interval=REMINDER_CHECK_INTERVAL * 60,  # Convert to seconds
-        first=30,  # Start 30 seconds after boot
+        interval=REMINDER_CHECK_INTERVAL * 60,
+        first=30,
         name="reminder_check"
     )
     log.info(f"Reminder job scheduled: every {REMINDER_CHECK_INTERVAL} minutes")

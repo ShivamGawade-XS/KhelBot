@@ -10,19 +10,8 @@ from services.cricapi import get_match_by_team
 from services.gemini import generate_dream11
 from database.users import update_user_query_count
 from utils.validators import extract_two_teams, extract_team_from_args
+from utils.reply import safe_reply
 from utils.logger import setup_logger
-
-from telegram.error import BadRequest
-async def safe_reply(update, text, **kwargs):
-    try:
-        await update.message.reply_text(text, **kwargs)
-    except BadRequest as e:
-        if "parse entities" in str(e).lower():
-            # Fallback without markdown
-            kwargs.pop("parse_mode", None)
-            await update.message.reply_text(text, **kwargs)
-        else:
-            raise e
 
 log = setup_logger("handler.dream11")
 
@@ -41,7 +30,6 @@ async def dream11_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     log.info(f"/dream11 from {user.id} | args: {args}")
 
-    # Track query
     try:
         update_user_query_count(user.id)
     except Exception:
@@ -54,7 +42,6 @@ async def dream11_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             parse_mode="Markdown")
         return
 
-    # Parse two teams
     team1, team2 = extract_two_teams(args)
 
     if not team1 or not team2:
@@ -74,19 +61,14 @@ async def dream11_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
         return
 
-    # Send loading message
-    await safe_reply(update, f"🏆 {team1} vs {team2} ka Dream11 team bana raha hoon... 🧠⏳"
-    )
+    await safe_reply(update, f"🏆 {team1} vs {team2} ka Dream11 team bana raha hoon... 🧠⏳")
 
-    # Fetch match data for context
     match_data = await get_match_by_team(team1)
     if not match_data:
         match_data = await get_match_by_team(team2)
 
-    # Generate Dream11 team
     dream11_team = await generate_dream11(team1, team2, match_data)
 
-    # Send with disclaimer
     response = f"{dream11_team}{DISCLAIMER}"
 
     if len(response) > 4000:

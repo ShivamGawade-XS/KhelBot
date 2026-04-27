@@ -11,19 +11,8 @@ from services.gemini import generate_prediction
 from database.users import update_user_query_count
 from database.predictions import log_prediction
 from utils.validators import extract_two_teams, extract_team_from_args
+from utils.reply import safe_reply
 from utils.logger import setup_logger
-
-from telegram.error import BadRequest
-async def safe_reply(update, text, **kwargs):
-    try:
-        await update.message.reply_text(text, **kwargs)
-    except BadRequest as e:
-        if "parse entities" in str(e).lower():
-            # Fallback without markdown
-            kwargs.pop("parse_mode", None)
-            await update.message.reply_text(text, **kwargs)
-        else:
-            raise e
 
 log = setup_logger("handler.predict")
 
@@ -41,7 +30,6 @@ async def predict_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     log.info(f"/predict from {user.id} | args: {args}")
 
-    # Track query
     try:
         update_user_query_count(user.id)
     except Exception:
@@ -54,11 +42,9 @@ async def predict_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             parse_mode="Markdown")
         return
 
-    # Parse two teams
     team1, team2 = extract_two_teams(args)
 
     if not team1 or not team2:
-        # Maybe user gave just one team
         single_team = extract_team_from_args(args)
         if single_team:
             await safe_reply(update, 
@@ -75,35 +61,25 @@ async def predict_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
         return
 
-    # Send loading message
-    await safe_reply(update, f"🔮 {team1} vs {team2} ka prediction generate kar raha hoon... ⏳"
-    )
+    await safe_reply(update, f"🔮 {team1} vs {team2} ka prediction generate kar raha hoon... ⏳")
 
-    # Try to get live match data for context
     match_data = await get_match_by_team(team1)
     if not match_data:
         match_data = await get_match_by_team(team2)
 
-    # Generate prediction
     prediction = await generate_prediction(team1, team2, match_data)
 
-    # Log prediction to database
     try:
         match_id = match_data.get("id", f"{team1}_vs_{team2}") if match_data else f"{team1}_vs_{team2}"
-        match_name = f"{team1} vs {team2}"
-        
-        # Try to extract confidence from the AI response
-        confidence = 50.0  # Default
         log_prediction(
             match_id=str(match_id),
-            match_name=match_name,
-            predicted_winner=team1,  # AI's pick (simplified)
-            confidence_pct=confidence,
+            match_name=f"{team1} vs {team2}",
+            predicted_winner=team1,
+            confidence_pct=50.0,
         )
     except Exception as e:
         log.error(f"Failed to log prediction: {e}")
 
-    # Send with disclaimer
     response = f"{prediction}{DISCLAIMER}"
 
     if len(response) > 4000:

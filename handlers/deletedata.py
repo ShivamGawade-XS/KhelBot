@@ -1,25 +1,13 @@
 """
 KhelBot /deletedata Handler — GDPR-style data deletion.
-Removes all user data from the database.
 """
 
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from database.users import delete_user_data
+from utils.reply import safe_reply
 from utils.logger import setup_logger
-
-from telegram.error import BadRequest
-async def safe_reply(update, text, **kwargs):
-    try:
-        await update.message.reply_text(text, **kwargs)
-    except BadRequest as e:
-        if "parse entities" in str(e).lower():
-            # Fallback without markdown
-            kwargs.pop("parse_mode", None)
-            await update.message.reply_text(text, **kwargs)
-        else:
-            raise e
 
 log = setup_logger("handler.deletedata")
 

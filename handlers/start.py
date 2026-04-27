@@ -1,24 +1,13 @@
 """
-KhelBot /start Handler — Onboarding and welcome message.
+KhelBot /start Handler — Onboarding and welcome message with inline keyboards.
 """
 
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from database.users import create_or_update_user
+from utils.reply import safe_reply
 from utils.logger import setup_logger
-
-from telegram.error import BadRequest
-async def safe_reply(update, text, **kwargs):
-    try:
-        await update.message.reply_text(text, **kwargs)
-    except BadRequest as e:
-        if "parse entities" in str(e).lower():
-            # Fallback without markdown
-            kwargs.pop("parse_mode", None)
-            await update.message.reply_text(text, **kwargs)
-        else:
-            raise e
 
 log = setup_logger("handler.start")
 
@@ -26,36 +15,54 @@ WELCOME_MESSAGE = """🏏 **Namaste! Main hoon KhelBot — India ka apna cricket
 
 Mere saath cricket aur bhi mast ho jayega! 🔥
 
-🎯 **Yeh commands use karo:**
+🎯 **Commands:**
 
-🏏 /live `<team>` — Live score + AI match context
-   _Example: /live rcb_
-
-🔮 /predict `<team1>` vs `<team2>` — Win prediction
-   _Example: /predict csk vs mi_
-
-🏆 /dream11 `<team1>` vs `<team2>` — Fantasy team
-   _Example: /dream11 kkr vs pbks_
-
-📊 /stats `<player>` — Player stats + summary
-   _Example: /stats virat kohli_
-
-⏰ /remind `<team>` — Match reminder set karo
-   _Example: /remind mi_
-
+🏏 /live `<team>` — Live score + AI context
+🔮 /predict `<team1> vs <team2>` — Win prediction
+🏆 /dream11 `<team1> vs <team2>` — Fantasy team
+📊 /stats `<player>` — Player stats + AI summary
+⚔️ /h2h `<team1> vs <team2>` — Head-to-head analysis
+🔄 /compare `<player1> vs <player2>` — Player comparison
+📅 /schedule `[team]` — Upcoming matches
+🏅 /points — IPL points table
+💬 /ask `<question>` — Ask anything cricket
+🧠 /quiz — Cricket trivia quiz
+⏰ /remind `<team>` — Match reminder
 📰 /news `[team]` — Cricket headlines
-   _Example: /news or /news rcb_
-
-🗑️ /deletedata — Apna data delete karo (Privacy)
+⭐ /favteam `<team>` — Set favorite team
+❓ /help — Quick command list
+🗑️ /deletedata — Delete your data
 
 ━━━━━━━━━━━━━━━━━━━━━━
-📍 **Team names:** CSK, MI, RCB, KKR, DC, RR, SRH, PBKS, GT, LSG
-   Ya short names bhi chalega — `csk`, `mumbai`, `kohli`, etc.
+📍 **Teams:** CSK, MI, RCB, KKR, DC, RR, SRH, PBKS, GT, LSG
+   Short names bhi chalega — `csk`, `mumbai`, `kohli`, etc.
 
-🔒 **Privacy:** Hum sirf tumhara Telegram ID aur username store karte hain.
-   Kabhi bhi /deletedata se apna data hata sakte ho.
+🔒 **Privacy:** Sirf Telegram ID aur username store hota hai.
+   Kabhi bhi /deletedata se hata sakte ho.
 
 Ab bolo, kaunsi team ka scene dekhna hai? 🏏🔥"""
+
+
+def get_start_keyboard() -> InlineKeyboardMarkup:
+    """Create inline keyboard with quick-access buttons."""
+    keyboard = [
+        [
+            InlineKeyboardButton("🏏 Live Scores", callback_data="cmd_live"),
+            InlineKeyboardButton("🔮 Predict", callback_data="cmd_predict"),
+        ],
+        [
+            InlineKeyboardButton("📰 News", callback_data="cmd_news"),
+            InlineKeyboardButton("🏅 Points Table", callback_data="cmd_points"),
+        ],
+        [
+            InlineKeyboardButton("🧠 Quiz", callback_data="cmd_quiz"),
+            InlineKeyboardButton("📅 Schedule", callback_data="cmd_schedule"),
+        ],
+        [
+            InlineKeyboardButton("❓ Help", callback_data="cmd_help"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -75,7 +82,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
     except Exception as e:
         log.error(f"Failed to register user {user.id}: {e}")
-        # Don't block the welcome message if DB fails
 
     await safe_reply(update, WELCOME_MESSAGE,
-        parse_mode="Markdown")
+        parse_mode="Markdown", reply_markup=get_start_keyboard())
