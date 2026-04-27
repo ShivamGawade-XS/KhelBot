@@ -15,12 +15,12 @@ from utils.logger import setup_logger
 from telegram.error import BadRequest
 async def safe_reply(update, text, **kwargs):
     try:
-        await safe_reply(update, text, **kwargs)
+        await update.message.reply_text(text, **kwargs)
     except BadRequest as e:
         if "parse entities" in str(e).lower():
             # Fallback without markdown
             kwargs.pop("parse_mode", None)
-            await safe_reply(update, text, **kwargs)
+            await update.message.reply_text(text, **kwargs)
         else:
             raise e
 
