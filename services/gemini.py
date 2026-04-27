@@ -323,6 +323,94 @@ IMPORTANT: Respond ONLY with the JSON, nothing else!"""
         return None
 
 
+async def generate_funfact() -> str:
+    """Generate a random cricket fun fact."""
+    prompt = """Tell me a RANDOM, SURPRISING cricket fun fact that most fans don't know!
+
+YOUR TASK:
+1. Pick a random, lesser-known cricket fact
+2. It can be about any era — old or new
+3. Make it genuinely surprising ("Arre sach mein?!" type)
+4. Add context — why is this interesting?
+5. End with a fun one-liner
+
+FORMAT:
+🤯 Cricket Ka Fun Fact
+
+[Your surprising fact with context]
+
+💡 [One-liner takeaway]
+
+Keep it under 150 words, Hinglish, and make it WOW-worthy!
+IMPORTANT: Pick a DIFFERENT fact every time — don't repeat!"""
+
+    return await _generate(prompt)
+
+
+async def generate_match_recap(match_data: dict) -> str:
+    """Generate an AI match recap/summary."""
+    if not match_data:
+        return FALLBACK_NO_DATA
+
+    prompt = f"""Give a complete match recap in Hinglish:
+
+MATCH DATA:
+{_format_match_for_prompt(match_data)}
+
+YOUR TASK:
+1. Match summary — kya hua match mein? (2-3 lines)
+2. Key performances — kaun chamka? (top 2-3 players)
+3. Turning point — match kab palti?
+4. Best moments — crowd ko kya pasand aaya?
+5. Final verdict — "Is match ka hero hai..."
+
+FORMAT:
+📝 Match Recap
+
+🏏 Summary: [what happened]
+⭐ Key Performers: [top players]
+🔄 Turning Point: [when match changed]
+🎯 Best Moments: [highlights]
+🏆 Hero: [match winner]
+
+Keep it under 250 words, exciting Hinglish!"""
+
+    return await _generate(prompt)
+
+
+async def generate_trending(headlines: list = None) -> str:
+    """Generate trending cricket topics analysis."""
+    context = ""
+    if headlines:
+        context = "\nCURRENT HEADLINES:\n" + "\n".join(f"- {h}" for h in headlines if h)
+
+    prompt = f"""What's TRENDING in cricket right now? Analyze the current cricket scene:
+{context}
+
+YOUR TASK:
+1. Top 3-5 trending topics in cricket right now
+2. For each topic — ek line summary + why it matters
+3. Hot takes — tumhara opinion on each
+4. One bold prediction about what will happen next
+
+FORMAT:
+🔥 Cricket Trending
+
+1. [Topic] — [why it's hot]
+   💭 KhelBot ka take: [opinion]
+
+2. [Topic] — [why it's hot]
+   💭 KhelBot ka take: [opinion]
+
+[... more topics]
+
+🎯 Bold Prediction: [your prediction]
+
+Keep it under 300 words, Hinglish, entertaining!"""
+
+    return await _generate(prompt)
+
+
 def _format_match_for_prompt(match_data: dict) -> str:
     """Format match data into a clean string for Gemini prompts."""
     if not match_data:
