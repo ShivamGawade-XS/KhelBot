@@ -30,7 +30,7 @@ CRICAPI_BASE_URL: str = "https://api.cricapi.com/v1"
 
 # ── Google Gemini ─────────────────────────────────────────
 GEMINI_API_KEY: str = _require("GEMINI_API_KEY")
-GEMINI_MODEL: str = "gemini-1.5-flash"
+GEMINI_MODEL: str = "gemini-2.5-flash"
 
 # ── Supabase ──────────────────────────────────────────────
 SUPABASE_URL: str = _require("SUPABASE_URL")

@@ -12,6 +12,18 @@ from utils.formatters import format_player_stats
 from utils.validators import sanitize_input
 from utils.logger import setup_logger
 
+from telegram.error import BadRequest
+async def safe_reply(update, text, **kwargs):
+    try:
+        await safe_reply(update, text, **kwargs)
+    except BadRequest as e:
+        if "parse entities" in str(e).lower():
+            # Fallback without markdown
+            kwargs.pop("parse_mode", None)
+            await safe_reply(update, text, **kwargs)
+        else:
+            raise e
+
 log = setup_logger("handler.stats")
 
 
@@ -29,40 +41,34 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         pass
 
     if not args:
-        await update.message.reply_text(
-            "📊 Kaunse player ka stats chahiye?\n\n"
+        await safe_reply(update, "📊 Kaunse player ka stats chahiye?\n\n"
             "Usage: `/stats <player name>`\n"
             "Example: `/stats virat kohli`",
-            parse_mode="Markdown"
-        )
+            parse_mode="Markdown")
         return
 
     # Sanitize and join player name
     player_name = sanitize_input(" ".join(args))
 
     if not player_name or len(player_name) < 2:
-        await update.message.reply_text(
-            "🤔 Player name thoda aur specific batao!\n"
+        await safe_reply(update, "🤔 Player name thoda aur specific batao!\n"
             "Example: `/stats ms dhoni`",
-            parse_mode="Markdown"
-        )
+            parse_mode="Markdown")
         return
 
     # Send loading message
-    await update.message.reply_text(
-        f"📊 {player_name} ka stats dhundh raha hoon... ⏳"
+    await safe_reply(update, f"📊 {player_name} ka stats dhundh raha hoon... ⏳"
     )
 
     # Fetch player data
     player_data = await get_player_stats(player_name)
 
     if not player_data:
-        await update.message.reply_text(
+        await safe_reply(update, 
             f"😕 '{player_name}' nahi mila database mein.\n\n"
             "Spelling check karo ya full name try karo!\n"
             "Example: `/stats virat kohli`",
-            parse_mode="Markdown"
-        )
+            parse_mode="Markdown")
         return
 
     # Format stats
@@ -75,10 +81,8 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     response = f"{stats_text}\n\n━━━━━━━━━━━━━━━━━━━━━━\n\n🤖 **KhelBot ka Take:**\n\n{ai_summary}"
 
     if len(response) > 4000:
-        await update.message.reply_text(stats_text, parse_mode="Markdown")
-        await update.message.reply_text(
-            f"🤖 **KhelBot ka Take:**\n\n{ai_summary}",
-            parse_mode="Markdown"
-        )
+        await safe_reply(update, stats_text, parse_mode="Markdown")
+        await safe_reply(update, f"🤖 **KhelBot ka Take:**\n\n{ai_summary}",
+            parse_mode="Markdown")
     else:
-        await update.message.reply_text(response, parse_mode="Markdown")
+        await safe_reply(update, response, parse_mode="Markdown")

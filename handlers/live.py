@@ -12,6 +12,18 @@ from utils.validators import extract_team_from_args
 from utils.formatters import format_score, format_match_list
 from utils.logger import setup_logger
 
+from telegram.error import BadRequest
+async def safe_reply(update, text, **kwargs):
+    try:
+        await safe_reply(update, text, **kwargs)
+    except BadRequest as e:
+        if "parse entities" in str(e).lower():
+            # Fallback without markdown
+            kwargs.pop("parse_mode", None)
+            await safe_reply(update, text, **kwargs)
+        else:
+            raise e
+
 log = setup_logger("handler.live")
 
 
@@ -30,7 +42,7 @@ async def live_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     # If no team specified, show all live matches
     if not args:
-        await update.message.reply_text(
+        await safe_reply(update, 
             "🏏 Kaun si team ka score chahiye?\n\n"
             "Usage: `/live <team>`\n"
             "Example: `/live rcb` ya `/live mumbai`\n\n"
@@ -40,13 +52,10 @@ async def live_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         matches = await get_live_matches()
         if matches:
-            await update.message.reply_text(
-                format_match_list(matches),
-                parse_mode="Markdown"
-            )
+            await safe_reply(update, format_match_list(matches),
+                parse_mode="Markdown")
         else:
-            await update.message.reply_text(
-                "😴 Abhi koi live match nahi chal raha. Thodi der mein check karo!"
+            await safe_reply(update, "😴 Abhi koi live match nahi chal raha. Thodi der mein check karo!"
             )
         return
 
@@ -54,7 +63,7 @@ async def live_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     team_name = extract_team_from_args(args)
     
     if not team_name:
-        await update.message.reply_text(
+        await safe_reply(update, 
             "🤔 Yeh team toh humne nahi suni bhai!\n\n"
             "Try karo: `csk`, `mi`, `rcb`, `kkr`, `dc`, `rr`, `srh`, `pbks`, `gt`, `lsg`\n\n"
             "Ya player names bhi chalte hain: `dhoni`, `kohli`, `rohit`",
@@ -63,13 +72,13 @@ async def live_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
 
     # Send "typing" indicator
-    await update.message.reply_text(f"🔍 {team_name} ka score dhundh raha hoon... ⏳")
+    await safe_reply(update, f"🔍 {team_name} ka score dhundh raha hoon... ⏳")
 
     # Fetch match data
     match_data = await get_match_by_team(team_name)
 
     if not match_data:
-        await update.message.reply_text(
+        await safe_reply(update, 
             f"😕 Abhi {team_name} ka koi live match nahi chal raha.\n\n"
             "Shayad match khatam ho gaya ya abhi shuru nahi hua. "
             "Thodi der mein try karo! 🏏"
@@ -88,10 +97,8 @@ async def live_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     # Telegram has 4096 char limit
     if len(response) > 4000:
         # Split into two messages
-        await update.message.reply_text(scorecard, parse_mode="Markdown")
-        await update.message.reply_text(
-            f"🤖 **KhelBot ka Take:**\n\n{ai_context}",
-            parse_mode="Markdown"
-        )
+        await safe_reply(update, scorecard, parse_mode="Markdown")
+        await safe_reply(update, f"🤖 **KhelBot ka Take:**\n\n{ai_context}",
+            parse_mode="Markdown")
     else:
-        await update.message.reply_text(response, parse_mode="Markdown")
+        await safe_reply(update, response, parse_mode="Markdown")

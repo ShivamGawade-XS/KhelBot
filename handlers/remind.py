@@ -28,20 +28,18 @@ async def remind_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         pass
 
     if not args:
-        await update.message.reply_text(
-            "⏰ Kaunsi team ka reminder set karna hai?\n\n"
+        await safe_reply(update, "⏰ Kaunsi team ka reminder set karna hai?\n\n"
             "Usage: `/remind <team>`\n"
             "Example: `/remind mi`\n\n"
             "Hum match se 30 min pehle yaad dila denge! 🔔",
-            parse_mode="Markdown"
-        )
+            parse_mode="Markdown")
         return
 
     # Resolve team name
     team_name = extract_team_from_args(args)
 
     if not team_name:
-        await update.message.reply_text(
+        await safe_reply(update, 
             "🤔 Yeh team toh samajh nahi aayi!\n\n"
             "Teams: CSK, MI, RCB, KKR, DC, RR, SRH, PBKS, GT, LSG",
             parse_mode="Markdown"
@@ -60,20 +58,17 @@ async def remind_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
 
         if success:
-            await update.message.reply_text(
-                f"✅ Done bhai! {team_name} ka match reminder set ho gaya! 🔔\n\n"
+            await safe_reply(update, f"✅ Done bhai! {team_name} ka match reminder set ho gaya! 🔔\n\n"
                 f"Match se pehle hum yaad dila denge. Ab tension nahi! 💪\n\n"
                 f"_Reminder check hota hai har 30 min mein_",
-                parse_mode="Markdown"
-            )
+                parse_mode="Markdown")
         else:
-            await update.message.reply_text(
-                "😕 Reminder set karne mein problem aayi. Thodi der mein try karo!"
+            await safe_reply(update, "😕 Reminder set karne mein problem aayi. Thodi der mein try karo!"
             )
 
     except Exception as e:
         log.error(f"Remind error for {user.id}: {e}")
-        await update.message.reply_text(
+        await safe_reply(update, 
             "😕 Kuch gadbad ho gayi reminder set karte waqt. Phir se try karo!"
         )
 
@@ -127,6 +122,18 @@ def setup_reminder_job(app: Application) -> None:
         app: Telegram Application instance
     """
     from config.settings import REMINDER_CHECK_INTERVAL
+
+from telegram.error import BadRequest
+async def safe_reply(update, text, **kwargs):
+    try:
+        await safe_reply(update, text, **kwargs)
+    except BadRequest as e:
+        if "parse entities" in str(e).lower():
+            # Fallback without markdown
+            kwargs.pop("parse_mode", None)
+            await safe_reply(update, text, **kwargs)
+        else:
+            raise e
 
     # Run every REMINDER_CHECK_INTERVAL minutes
     app.job_queue.run_repeating(

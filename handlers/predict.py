@@ -13,6 +13,18 @@ from database.predictions import log_prediction
 from utils.validators import extract_two_teams, extract_team_from_args
 from utils.logger import setup_logger
 
+from telegram.error import BadRequest
+async def safe_reply(update, text, **kwargs):
+    try:
+        await safe_reply(update, text, **kwargs)
+    except BadRequest as e:
+        if "parse entities" in str(e).lower():
+            # Fallback without markdown
+            kwargs.pop("parse_mode", None)
+            await safe_reply(update, text, **kwargs)
+        else:
+            raise e
+
 log = setup_logger("handler.predict")
 
 DISCLAIMER = (
@@ -36,12 +48,10 @@ async def predict_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         pass
 
     if not args:
-        await update.message.reply_text(
-            "🔮 Kaunsi teams ka prediction chahiye?\n\n"
+        await safe_reply(update, "🔮 Kaunsi teams ka prediction chahiye?\n\n"
             "Usage: `/predict <team1> vs <team2>`\n"
             "Example: `/predict csk vs mi`",
-            parse_mode="Markdown"
-        )
+            parse_mode="Markdown")
         return
 
     # Parse two teams
@@ -51,13 +61,13 @@ async def predict_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Maybe user gave just one team
         single_team = extract_team_from_args(args)
         if single_team:
-            await update.message.reply_text(
+            await safe_reply(update, 
                 f"🤔 {single_team} ka prediction chahiye, but dusri team bhi batao!\n\n"
                 f"Usage: `/predict {single_team} vs <team2>`",
                 parse_mode="Markdown"
             )
         else:
-            await update.message.reply_text(
+            await safe_reply(update, 
                 "🤔 Teams samajh nahi aaye bhai!\n\n"
                 "Usage: `/predict csk vs mi`\n"
                 "Teams: CSK, MI, RCB, KKR, DC, RR, SRH, PBKS, GT, LSG",
@@ -66,8 +76,7 @@ async def predict_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     # Send loading message
-    await update.message.reply_text(
-        f"🔮 {team1} vs {team2} ka prediction generate kar raha hoon... ⏳"
+    await safe_reply(update, f"🔮 {team1} vs {team2} ka prediction generate kar raha hoon... ⏳"
     )
 
     # Try to get live match data for context
@@ -98,7 +107,7 @@ async def predict_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     response = f"{prediction}{DISCLAIMER}"
 
     if len(response) > 4000:
-        await update.message.reply_text(prediction, parse_mode="Markdown")
-        await update.message.reply_text(DISCLAIMER, parse_mode="Markdown")
+        await safe_reply(update, prediction, parse_mode="Markdown")
+        await safe_reply(update, DISCLAIMER, parse_mode="Markdown")
     else:
-        await update.message.reply_text(response, parse_mode="Markdown")
+        await safe_reply(update, response, parse_mode="Markdown")

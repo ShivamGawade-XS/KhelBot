@@ -9,6 +9,18 @@ from telegram.ext import ContextTypes
 from database.users import delete_user_data
 from utils.logger import setup_logger
 
+from telegram.error import BadRequest
+async def safe_reply(update, text, **kwargs):
+    try:
+        await safe_reply(update, text, **kwargs)
+    except BadRequest as e:
+        if "parse entities" in str(e).lower():
+            # Fallback without markdown
+            kwargs.pop("parse_mode", None)
+            await safe_reply(update, text, **kwargs)
+        else:
+            raise e
+
 log = setup_logger("handler.deletedata")
 
 
@@ -22,8 +34,7 @@ async def deletedata_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         success = delete_user_data(telegram_id=user.id)
 
         if success:
-            await update.message.reply_text(
-                "✅ **Data Delete Ho Gaya!**\n\n"
+            await safe_reply(update, "✅ **Data Delete Ho Gaya!**\n\n"
                 "Tumhara saara data (profile + reminders) delete ho gaya hai. 🗑️\n\n"
                 "Predictions mein tumhara koi personal data nahi tha, "
                 "toh woh safe hai.\n\n"
@@ -33,15 +44,14 @@ async def deletedata_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 parse_mode="Markdown"
             )
         else:
-            await update.message.reply_text(
-                "😕 Data delete karne mein problem aayi.\n"
+            await safe_reply(update, "😕 Data delete karne mein problem aayi.\n"
                 "Shayad pehle se koi data nahi tha. "
                 "Agar problem ho toh dobara try karo!"
             )
 
     except Exception as e:
         log.error(f"Delete data error for {user.id}: {e}")
-        await update.message.reply_text(
+        await safe_reply(update, 
             "❌ Kuch gadbad ho gayi data delete karte waqt.\n"
             "Thodi der mein phir se try karo!"
         )

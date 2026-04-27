@@ -8,6 +8,18 @@ from telegram.ext import ContextTypes
 from database.users import create_or_update_user
 from utils.logger import setup_logger
 
+from telegram.error import BadRequest
+async def safe_reply(update, text, **kwargs):
+    try:
+        await safe_reply(update, text, **kwargs)
+    except BadRequest as e:
+        if "parse entities" in str(e).lower():
+            # Fallback without markdown
+            kwargs.pop("parse_mode", None)
+            await safe_reply(update, text, **kwargs)
+        else:
+            raise e
+
 log = setup_logger("handler.start")
 
 WELCOME_MESSAGE = """🏏 **Namaste! Main hoon KhelBot — India ka apna cricket buddy!**
@@ -65,7 +77,5 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         log.error(f"Failed to register user {user.id}: {e}")
         # Don't block the welcome message if DB fails
 
-    await update.message.reply_text(
-        WELCOME_MESSAGE,
-        parse_mode="Markdown"
-    )
+    await safe_reply(update, WELCOME_MESSAGE,
+        parse_mode="Markdown")

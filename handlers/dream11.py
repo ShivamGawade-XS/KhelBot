@@ -12,6 +12,18 @@ from database.users import update_user_query_count
 from utils.validators import extract_two_teams, extract_team_from_args
 from utils.logger import setup_logger
 
+from telegram.error import BadRequest
+async def safe_reply(update, text, **kwargs):
+    try:
+        await safe_reply(update, text, **kwargs)
+    except BadRequest as e:
+        if "parse entities" in str(e).lower():
+            # Fallback without markdown
+            kwargs.pop("parse_mode", None)
+            await safe_reply(update, text, **kwargs)
+        else:
+            raise e
+
 log = setup_logger("handler.dream11")
 
 DISCLAIMER = (
@@ -36,12 +48,10 @@ async def dream11_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         pass
 
     if not args:
-        await update.message.reply_text(
-            "🏆 Kaunsi match ka Dream11 team chahiye?\n\n"
+        await safe_reply(update, "🏆 Kaunsi match ka Dream11 team chahiye?\n\n"
             "Usage: `/dream11 <team1> vs <team2>`\n"
             "Example: `/dream11 kkr vs pbks`",
-            parse_mode="Markdown"
-        )
+            parse_mode="Markdown")
         return
 
     # Parse two teams
@@ -50,13 +60,13 @@ async def dream11_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if not team1 or not team2:
         single_team = extract_team_from_args(args)
         if single_team:
-            await update.message.reply_text(
+            await safe_reply(update, 
                 f"🤔 {single_team} ka Dream11 chahiye, but dusri team bhi batao!\n\n"
                 f"Usage: `/dream11 {single_team} vs <team2>`",
                 parse_mode="Markdown"
             )
         else:
-            await update.message.reply_text(
+            await safe_reply(update, 
                 "🤔 Teams samajh nahi aaye bhai!\n\n"
                 "Usage: `/dream11 csk vs mi`\n"
                 "Teams: CSK, MI, RCB, KKR, DC, RR, SRH, PBKS, GT, LSG",
@@ -65,8 +75,7 @@ async def dream11_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     # Send loading message
-    await update.message.reply_text(
-        f"🏆 {team1} vs {team2} ka Dream11 team bana raha hoon... 🧠⏳"
+    await safe_reply(update, f"🏆 {team1} vs {team2} ka Dream11 team bana raha hoon... 🧠⏳"
     )
 
     # Fetch match data for context
@@ -81,7 +90,7 @@ async def dream11_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     response = f"{dream11_team}{DISCLAIMER}"
 
     if len(response) > 4000:
-        await update.message.reply_text(dream11_team, parse_mode="Markdown")
-        await update.message.reply_text(DISCLAIMER, parse_mode="Markdown")
+        await safe_reply(update, dream11_team, parse_mode="Markdown")
+        await safe_reply(update, DISCLAIMER, parse_mode="Markdown")
     else:
-        await update.message.reply_text(response, parse_mode="Markdown")
+        await safe_reply(update, response, parse_mode="Markdown")
