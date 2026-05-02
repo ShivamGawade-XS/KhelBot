@@ -1,30 +1,19 @@
 """
-KhelBot Gemini Service — AI-powered Hinglish cricket commentary.
-Uses Google Gemini 2.5 Flash for speed and generous free tier.
+KhelBot AI Service — AI-powered Hinglish cricket commentary.
+Uses Meta Llama 3 via Groq for blazing speed and free tier.
 """
 
 import json
-import google.generativeai as genai
+from groq import AsyncGroq
 from typing import Optional
 
-from config.settings import GEMINI_API_KEY, GEMINI_MODEL
+from config.settings import GROQ_API_KEY, GROQ_MODEL
 from utils.logger import setup_logger
 
-log = setup_logger("gemini")
+log = setup_logger("ai_service")
 
-# Configure Gemini
-genai.configure(api_key=GEMINI_API_KEY)
-
-# Model with KhelBot personality
-_model = genai.GenerativeModel(
-    model_name=GEMINI_MODEL,
-    generation_config={
-        "temperature": 0.7,
-        "top_p": 0.95,
-        "top_k": 40,
-        "max_output_tokens": 700,
-    }
-)
+# Configure Groq
+_client = AsyncGroq(api_key=GROQ_API_KEY)
 
 # ── System Personality ────────────────────────────────────
 SYSTEM_PERSONALITY = """You are KhelBot 🏏 — India ka apna cricket buddy!
@@ -47,19 +36,27 @@ FALLBACK_NO_DATA = "Bhai, data nahi mil raha abhi 🤷‍♂️ API wale chai br
 
 
 async def _generate(prompt: str) -> str:
-    """Generate a response from Gemini with error handling."""
+    """Generate a response from Groq with error handling."""
     try:
-        full_prompt = f"{SYSTEM_PERSONALITY}\n\n{prompt}"
-        response = await _model.generate_content_async(full_prompt)
+        response = await _client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[
+                {"role": "system", "content": SYSTEM_PERSONALITY},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=700,
+            top_p=0.95
+        )
         
-        if response and response.text:
-            return response.text.strip()
+        if response and response.choices:
+            return response.choices[0].message.content.strip()
         
-        log.warning("Gemini returned empty response")
+        log.warning("Groq returned empty response")
         return FALLBACK_ERROR
 
     except Exception as e:
-        log.error(f"Gemini generation error: {e}")
+        log.error(f"Groq generation error: {e}")
         return FALLBACK_ERROR
 
 
@@ -280,7 +277,7 @@ Keep it under 250 words!"""
 
 
 async def generate_quiz_question() -> Optional[dict]:
-    """Generate a cricket trivia question with 4 options."""
+    """Generate a cricket trivia question with 4 options using Groq JSON mode."""
     prompt = """Generate a cricket trivia question for an Indian cricket fan.
 
 REQUIREMENTS:
@@ -290,21 +287,25 @@ REQUIREMENTS:
 4. Mix of easy and medium difficulty
 5. Include a brief explanation for the correct answer
 
-RESPOND IN EXACTLY THIS JSON FORMAT (no markdown, no extra text):
+RESPOND IN EXACTLY THIS JSON FORMAT:
 {"question": "your question here?", "options": ["Option A", "Option B", "Option C", "Option D"], "correct": 0, "explanation": "Brief explanation in Hinglish"}
 
 Where "correct" is the index (0-3) of the correct option.
-IMPORTANT: Respond ONLY with the JSON, nothing else!"""
+IMPORTANT: Respond ONLY with valid JSON."""
 
     try:
-        full_prompt = f"{SYSTEM_PERSONALITY}\n\n{prompt}"
-        response = await _model.generate_content_async(full_prompt)
+        response = await _client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[
+                {"role": "system", "content": SYSTEM_PERSONALITY},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7
+        )
         
-        if response and response.text:
-            text = response.text.strip()
-            # Clean up potential markdown formatting
-            text = text.replace("```json", "").replace("```", "").strip()
-            
+        if response and response.choices:
+            text = response.choices[0].message.content.strip()
             quiz_data = json.loads(text)
             
             # Validate structure
