@@ -30,7 +30,7 @@ CRICAPI_BASE_URL: str = "https://api.cricapi.com/v1"
 
 # ── Meta Llama 3 via Groq ──────────────────────────────────
 GROQ_API_KEY: str = _require("GROQ_API_KEY")
-GROQ_MODEL: str = "llama3-70b-8192"
+GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
 # ── Supabase ──────────────────────────────────────────────
 SUPABASE_URL: str = _require("SUPABASE_URL")
