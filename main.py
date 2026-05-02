@@ -35,6 +35,9 @@ from handlers.poll import poll_command
 from handlers.trending import trending_command
 from handlers.today import today_command
 from handlers.caps import orangecap_command, purplecap_command
+from handlers.roast import roast_command
+from handlers.pitch import pitch_command
+from handlers.playing11 import playing11_command
 from handlers.callbacks import button_callback
 from handlers.chat import chat_handler
 from utils.logger import setup_logger
@@ -49,6 +52,8 @@ BOT_COMMANDS = [
     BotCommand("help", "❓ All commands"),
     BotCommand("today", "📺 Today's matches"),
     BotCommand("live", "🏏 Live score + AI context"),
+    BotCommand("playing11", "📋 Playing 11 & Lineups"),
+    BotCommand("pitch", "🏟️ Pitch & Weather report"),
     BotCommand("predict", "🔮 Win prediction"),
     BotCommand("dream11", "🏆 Fantasy team suggestion"),
     BotCommand("stats", "📊 Player statistics"),
@@ -60,6 +65,7 @@ BOT_COMMANDS = [
     BotCommand("purplecap", "💜 Purple Cap race"),
     BotCommand("ask", "💬 Ask anything cricket"),
     BotCommand("quiz", "🧠 Cricket trivia quiz"),
+    BotCommand("roast", "🔥 Roast a team/player"),
     BotCommand("recap", "📝 Match recap"),
     BotCommand("trending", "🔥 Trending cricket topics"),
     BotCommand("funfact", "🤯 Random cricket fact"),
@@ -100,7 +106,7 @@ def main() -> None:
     """Initialize and start the KhelBot."""
     
     log.info("=" * 50)
-    log.info("🏏 KhelBot V3 starting up...")
+    log.info("🏏 KhelBot V4 starting up...")
     log.info("=" * 50)
 
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
@@ -111,6 +117,8 @@ def main() -> None:
         ("help", help_command),
         ("today", today_command),
         ("live", live_command),
+        ("playing11", playing11_command),
+        ("pitch", pitch_command),
         ("predict", predict_command),
         ("dream11", dream11_command),
         ("stats", stats_command),
@@ -122,6 +130,7 @@ def main() -> None:
         ("purplecap", purplecap_command),
         ("ask", ask_command),
         ("quiz", quiz_command),
+        ("roast", roast_command),
         ("recap", recap_command),
         ("trending", trending_command),
         ("funfact", funfact_command),
@@ -164,7 +173,7 @@ def main() -> None:
     keep_alive()
 
     # ── Start Polling ─────────────────────────────────────
-    log.info("🚀 KhelBot V3 is live! Polling for updates...")
+    log.info("🚀 KhelBot V4 is live! Polling for updates...")
     log.info(f"📋 {len(commands)} commands + chat + callbacks")
     log.info("Press Ctrl+C to stop")
     

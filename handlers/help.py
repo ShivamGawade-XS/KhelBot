@@ -11,13 +11,15 @@ from utils.logger import setup_logger
 
 log = setup_logger("handler.help")
 
-HELP_TEXT = """🏏 **KhelBot V3 Commands** 🏏
+HELP_TEXT = """🏏 **KhelBot V4 Commands** 🏏
 
 *Real-Time & Live Search Powered!* ⚡🔍
 
 🎯 **Daily Action:**
 /today — 📺 Aaj ke matches
 /live `<team>` — Live score + AI context
+/playing11 `<team>` — 📋 Playing 11 & Lineups
+/pitch `<match>` — 🏟️ Pitch & Weather report
 /remind `<team>` — Match reminder set karo
 
 🔥 **AI Analysis (Web Search Enabled):**
@@ -34,6 +36,7 @@ HELP_TEXT = """🏏 **KhelBot V3 Commands** 🏏
 /schedule `[team]` — Upcoming matches
 
 💬 **Just For Fun:**
+/roast `<team/player>` — 🔥 Roast em! (Savage mode)
 /ask `<question>` — Ask me anything!
 /trending — 🔥 What's hot in cricket
 /news `[team]` — Cricket headlines
