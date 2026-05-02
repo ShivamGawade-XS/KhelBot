@@ -42,7 +42,11 @@ async def recap_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             parse_mode="Markdown")
         return
 
-    await safe_reply(update, f"📝 {team_name} ka match recap generate kar raha hoon... ⏳")
+    await safe_reply(update, f"📝 {team_name} ka match recap generate kar raha hoon... 🔍🧠")
+
+    # Search the web for actual match results
+    from services.web_search import search_web
+    live_context = await search_web(f"{team_name} IPL 2026 last match result scorecard")
 
     # Find the most recent match for this team
     match_data = await get_match_by_team(team_name)
@@ -59,11 +63,11 @@ async def recap_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             if match_data:
                 break
 
-    if not match_data:
+    if not match_data and not live_context:
         await safe_reply(update, f"😕 {team_name} ka koi recent match nahi mila.")
         return
 
-    recap = await generate_match_recap(match_data)
+    recap = await generate_match_recap(match_data, live_context=live_context)
 
     if len(recap) > 4000:
         mid = len(recap) // 2

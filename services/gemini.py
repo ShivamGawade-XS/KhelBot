@@ -395,13 +395,20 @@ IMPORTANT: Respond ONLY with valid JSON."""
         return None
 
 
-async def generate_funfact() -> str:
-    """Generate a random cricket fun fact."""
-    prompt = """Tell me a RANDOM, SURPRISING cricket fun fact that most fans don't know!
+async def generate_funfact(live_context: str = "") -> str:
+    """Generate a random cricket fun fact using live web data."""
+    web_section = ""
+    if live_context:
+        web_section = f"""\n\n--- LIVE WEB SEARCH (cricket records, news, facts) ---
+{live_context}
+--- END ---\n"""
 
+    prompt = f"""Tell me a SURPRISING cricket fun fact or record based on this real data!
+
+{web_section}
 YOUR TASK:
-1. Pick a random, lesser-known cricket fact
-2. It can be about any era — old or new
+1. Pick the most mind-blowing fact from the search results
+2. It can be a new world record, an insane stat, or a crazy milestone
 3. Make it genuinely surprising ("Arre sach mein?!" type)
 4. Add context — why is this interesting?
 5. End with a fun one-liner
@@ -409,29 +416,38 @@ YOUR TASK:
 FORMAT:
 🤯 Cricket Ka Fun Fact
 
-[Your surprising fact with context]
+[Your surprising fact with context based on REAL data]
 
 💡 [One-liner takeaway]
 
 Keep it under 150 words, Hinglish, and make it WOW-worthy!
-IMPORTANT: Pick a DIFFERENT fact every time — don't repeat!"""
+IMPORTANT: Only state facts that are TRUE according to the search results!"""
 
     return await _generate(prompt)
 
 
-async def generate_match_recap(match_data: dict) -> str:
-    """Generate an AI match recap/summary."""
-    if not match_data:
+async def generate_match_recap(match_data: dict, live_context: str = "") -> str:
+    """Generate an AI match recap/summary with live web data."""
+    if not match_data and not live_context:
         return FALLBACK_NO_DATA
+        
+    match_context = ""
+    if match_data:
+        match_context = f"\nMATCH DATA:\n{_format_match_for_prompt(match_data)}"
+        
+    web_section = ""
+    if live_context:
+        web_section = f"""\n\n--- LIVE WEB SEARCH (scorecards, match reports, news) ---
+{live_context}
+--- END ---\n"""
 
-    prompt = f"""Give a complete match recap in Hinglish:
+    prompt = f"""Give a complete match recap in Hinglish based on this REAL data:
 
-MATCH DATA:
-{_format_match_for_prompt(match_data)}
-
+{match_context}
+{web_section}
 YOUR TASK:
-1. Match summary — kya hua match mein? (2-3 lines)
-2. Key performances — kaun chamka? (top 2-3 players)
+1. Match summary — kya hua match mein? Kaun jeeta? (use REAL data!)
+2. Key performances — kaun chamka? (top 2-3 players with real scores/wickets)
 3. Turning point — match kab palti?
 4. Best moments — crowd ko kya pasand aaya?
 5. Final verdict — "Is match ka hero hai..."
@@ -440,7 +456,7 @@ FORMAT:
 📝 Match Recap
 
 🏏 Summary: [what happened]
-⭐ Key Performers: [top players]
+⭐ Key Performers: [top players with real stats]
 🔄 Turning Point: [when match changed]
 🎯 Best Moments: [highlights]
 🏆 Hero: [match winner]

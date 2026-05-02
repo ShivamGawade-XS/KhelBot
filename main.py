@@ -33,6 +33,8 @@ from handlers.recap import recap_command
 from handlers.accuracy import accuracy_command
 from handlers.poll import poll_command
 from handlers.trending import trending_command
+from handlers.today import today_command
+from handlers.caps import orangecap_command, purplecap_command
 from handlers.callbacks import button_callback
 from handlers.chat import chat_handler
 from utils.logger import setup_logger
@@ -45,6 +47,7 @@ log = setup_logger("main")
 BOT_COMMANDS = [
     BotCommand("start", "🏏 Start KhelBot"),
     BotCommand("help", "❓ All commands"),
+    BotCommand("today", "📺 Today's matches"),
     BotCommand("live", "🏏 Live score + AI context"),
     BotCommand("predict", "🔮 Win prediction"),
     BotCommand("dream11", "🏆 Fantasy team suggestion"),
@@ -53,6 +56,8 @@ BOT_COMMANDS = [
     BotCommand("compare", "🔄 Player comparison"),
     BotCommand("schedule", "📅 Upcoming matches"),
     BotCommand("points", "🏅 IPL points table"),
+    BotCommand("orangecap", "🧡 Orange Cap race"),
+    BotCommand("purplecap", "💜 Purple Cap race"),
     BotCommand("ask", "💬 Ask anything cricket"),
     BotCommand("quiz", "🧠 Cricket trivia quiz"),
     BotCommand("recap", "📝 Match recap"),
@@ -104,6 +109,7 @@ def main() -> None:
     commands = [
         ("start", start_command),
         ("help", help_command),
+        ("today", today_command),
         ("live", live_command),
         ("predict", predict_command),
         ("dream11", dream11_command),
@@ -112,6 +118,8 @@ def main() -> None:
         ("compare", compare_command),
         ("schedule", schedule_command),
         ("points", points_command),
+        ("orangecap", orangecap_command),
+        ("purplecap", purplecap_command),
         ("ask", ask_command),
         ("quiz", quiz_command),
         ("recap", recap_command),
@@ -165,3 +173,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

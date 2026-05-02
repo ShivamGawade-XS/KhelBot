@@ -11,36 +11,41 @@ from utils.logger import setup_logger
 
 log = setup_logger("handler.start")
 
-WELCOME_MESSAGE = """🏏 **Namaste! Main hoon KhelBot — India ka apna cricket buddy!**
+WELCOME_MESSAGE = """🏏 **Namaste! Main hoon KhelBot V3 — India ka apna LIVE cricket buddy!**
 
-Mere saath cricket aur bhi mast ho jayega! 🔥
+Mere paas ab **Real-Time Web Search** ki shakti hai! 🔥
+Main direct internet se live data, stats, aur news nikaal ke answers deta hoon!
 
-🎯 **Commands:**
+🎯 **Naye Commands:**
+/today — 📺 Aaj ke matches aur timings
+/orangecap — 🧡 Orange Cap race stats
+/purplecap — 💜 Purple Cap race stats
 
-🏏 /live `<team>` — Live score + AI context
-🔮 /predict `<team1> vs <team2>` — Win prediction
-🏆 /dream11 `<team1> vs <team2>` — Fantasy team
-📊 /stats `<player>` — Player stats + AI summary
-⚔️ /h2h `<team1> vs <team2>` — Head-to-head analysis
-🔄 /compare `<player1> vs <player2>` — Player comparison
-📅 /schedule `[team]` — Upcoming matches
-🏅 /points — IPL points table
-💬 /ask `<question>` — Ask anything cricket
-🧠 /quiz — Cricket trivia quiz
-⏰ /remind `<team>` — Match reminder
-📰 /news `[team]` — Cricket headlines
-⭐ /favteam `<team>` — Set favorite team
+🏆 **Match Action:**
+/live `<team>` — Live score + AI context
+/predict `<team1> vs <team2>` — Win prediction (Live form data)
+/dream11 `<team1> vs <team2>` — Fantasy team (Real squads)
+/remind `<team>` — Match reminder
+
+📊 **AI Analysis:**
+/stats `<player>` — Player stats + AI summary
+/h2h `<team1> vs <team2>` — Head-to-head analysis
+/compare `<p1> vs <p2>` — Player comparison
+/schedule `[team]` — Upcoming matches
+
+💬 **Chat & Fun:**
+/ask `<question>` — Ask anything (Web Search Enabled!)
+/news `[team]` — Cricket headlines
+/trending — Trending cricket topics
+/quiz — Cricket trivia quiz
+
 ❓ /help — Quick command list
-🗑️ /deletedata — Delete your data
 
 ━━━━━━━━━━━━━━━━━━━━━━
 📍 **Teams:** CSK, MI, RCB, KKR, DC, RR, SRH, PBKS, GT, LSG
    Short names bhi chalega — `csk`, `mumbai`, `kohli`, etc.
 
-🔒 **Privacy:** Sirf Telegram ID aur username store hota hai.
-   Kabhi bhi /deletedata se hata sakte ho.
-
-Ab bolo, kaunsi team ka scene dekhna hai? 🏏🔥"""
+_Ab bolo, aaj kya chal raha hai cricket ki duniya mein?_ 🏏🔥"""
 
 
 def get_start_keyboard() -> InlineKeyboardMarkup:
