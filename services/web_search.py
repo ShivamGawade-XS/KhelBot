@@ -50,9 +50,8 @@ def _sync_search(query: str, max_results: int) -> list:
     try:
         from ddgs import DDGS
         results = DDGS().text(
-            keywords=f"{query} cricket",
-            max_results=max_results,
-            region="in-en"
+            query=f"{query} cricket",
+            max_results=max_results
         )
         return results
     except Exception as e:
