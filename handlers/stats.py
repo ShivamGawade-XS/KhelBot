@@ -43,7 +43,11 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             parse_mode="Markdown")
         return
 
-    await safe_reply(update, f"📊 {player_name} ka stats dhundh raha hoon... ⏳")
+    await safe_reply(update, f"📊 {player_name} ka stats dhundh raha hoon... 🔍⏳")
+
+    # Search the web for latest player form and news
+    from services.web_search import search_player_info
+    live_context = await search_player_info(player_name)
 
     player_data = await get_player_stats(player_name)
 
@@ -56,7 +60,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     stats_text = format_player_stats(player_data)
-    ai_summary = await generate_player_summary(player_name, player_data)
+    ai_summary = await generate_player_summary(player_name, player_data, live_context=live_context)
 
     response = f"{stats_text}\n\n━━━━━━━━━━━━━━━━━━━━━━\n\n🤖 **KhelBot ka Take:**\n\n{ai_summary}"
 

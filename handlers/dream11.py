@@ -61,13 +61,17 @@ async def dream11_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
         return
 
-    await safe_reply(update, f"🏆 {team1} vs {team2} ka Dream11 team bana raha hoon... 🧠⏳")
+    await safe_reply(update, f"🏆 {team1} vs {team2} ka Dream11 team bana raha hoon... 🔍🧠")
+
+    # Search the web for squads, form, injuries, pitch report
+    from services.web_search import search_web
+    live_context = await search_web(f"{team1} vs {team2} dream11 team prediction playing 11 today")
 
     match_data = await get_match_by_team(team1)
     if not match_data:
         match_data = await get_match_by_team(team2)
 
-    dream11_team = await generate_dream11(team1, team2, match_data)
+    dream11_team = await generate_dream11(team1, team2, match_data, live_context=live_context)
 
     response = f"{dream11_team}{DISCLAIMER}"
 

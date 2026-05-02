@@ -83,51 +83,73 @@ Remember: Be enthusiastic, use Hinglish, and keep it under 250 words!"""
     return await _generate(prompt)
 
 
-async def generate_prediction(team1: str, team2: str, match_data: dict = None) -> str:
-    """Generate win probability prediction."""
+async def generate_prediction(team1: str, team2: str, match_data: dict = None, live_context: str = "") -> str:
+    """Generate win probability prediction with live web data."""
+    from datetime import datetime
+    today = datetime.now().strftime("%B %d, %Y")
+    
     match_context = ""
     if match_data:
         match_context = f"\nCURRENT MATCH DATA:\n{_format_match_for_prompt(match_data)}"
+    
+    web_section = ""
+    if live_context:
+        web_section = f"""\n\n--- LIVE WEB SEARCH (recent form, injuries, pitch reports) ---
+{live_context}
+--- END ---\n"""
 
     prompt = f"""Predict the winner of this cricket match:
 
+TODAY'S DATE: {today}
 {team1} vs {team2}
 {match_context}
-
+{web_section}
 YOUR TASK:
 1. Give a WIN PROBABILITY percentage for each team (must add up to 100%)
-2. List 3-4 KEY FACTORS affecting the prediction
-3. Name the PLAYER TO WATCH from each team
-4. Give your FINAL VERDICT — "Mera prediction hai..."
+2. List 3-4 KEY FACTORS — use REAL recent form data from search results
+3. Mention any injuries, pitch conditions, weather from search results
+4. Name the PLAYER TO WATCH from each team based on CURRENT form
+5. Give your FINAL VERDICT — "Mera prediction hai..."
 
 FORMAT:
 🔮 Win Probability:
   {team1}: X%
   {team2}: Y%
 
-Key Factors: (3-4 bullet points)
-Players to Watch: (1 from each team)
-Final Verdict: (Your confident Hinglish take)
+📊 Key Factors: (3-4 bullet points with real data)
+🚑 Team News: (injuries/changes if found)
+⭐ Players to Watch: (1 from each team)
+🏏 Final Verdict: (Your confident Hinglish take)
 
 Remember: This is ENTERTAINMENT ONLY, not betting advice!"""
 
     return await _generate(prompt)
 
 
-async def generate_dream11(team1: str, team2: str, match_data: dict = None) -> str:
-    """Generate Dream11 fantasy team suggestion."""
+async def generate_dream11(team1: str, team2: str, match_data: dict = None, live_context: str = "") -> str:
+    """Generate Dream11 fantasy team suggestion with live web data."""
+    from datetime import datetime
+    today = datetime.now().strftime("%B %d, %Y")
+    
     match_context = ""
     if match_data:
         match_context = f"\nMATCH DATA:\n{_format_match_for_prompt(match_data)}"
+    
+    web_section = ""
+    if live_context:
+        web_section = f"""\n\n--- LIVE WEB SEARCH (squads, form, injuries, pitch) ---
+{live_context}
+--- END ---\n"""
 
     prompt = f"""Suggest a Dream11 fantasy cricket team for:
 
+TODAY'S DATE: {today}
 {team1} vs {team2}
 {match_context}
+{web_section}
+YOUR TASK — Create an 11-player Dream11 team using REAL current squad data:
 
-YOUR TASK — Create an 11-player Dream11 team:
-
-1. Pick exactly 11 players:
+1. Pick exactly 11 players from the ACTUAL current squads (use search results!):
    - 1-2 Wicketkeepers (WK)
    - 3-5 Batsmen (BAT)
    - 1-3 All-rounders (AR)
@@ -136,70 +158,95 @@ YOUR TASK — Create an 11-player Dream11 team:
 2. For each player, mention:
    - Name + Role (WK/BAT/AR/BOWL)
    - Which team they play for
+   - Current form (runs/wickets in recent matches from search results)
 
-3. CAPTAIN (C) — explain WHY (2x points wala banda)
-4. VICE-CAPTAIN (VC) — explain WHY (1.5x points)
-5. RISK/DIFFERENTIAL PICK — one underrated player
+3. CAPTAIN (C) — explain WHY with recent stats (2x points wala banda)
+4. VICE-CAPTAIN (VC) — explain WHY with recent stats (1.5x points)
+5. RISK/DIFFERENTIAL PICK — one underrated player who is in form
 
 6. Give PROJECTED FANTASY POINTS RANGE for the team
+7. 🏟️ PITCH REPORT — if available from search results
 
 FORMAT:
 🏆 Dream11 Team: {team1} vs {team2}
 
-WK: [names]
-BAT: [names]
-AR: [names]
-BOWL: [names]
+🏟️ Pitch: [conditions if known]
 
-👑 Captain: [name] — [reason]
-🥈 Vice-Captain: [name] — [reason]
-🎲 Risk Pick: [name] — [reason]
+WK: [names + recent form]
+BAT: [names + recent form]
+AR: [names + recent form]
+BOWL: [names + recent form]
+
+👑 Captain: [name] — [reason with stats]
+🥈 Vice-Captain: [name] — [reason with stats]
+🎲 Risk Pick: [name] — [why this pick]
 
 📊 Projected Points: XX-XX
 
-Remember: Hinglish mein bolo, and be confident in your picks!"""
+Remember: Hinglish mein bolo, use REAL data, and be confident!"""
 
     return await _generate(prompt)
 
 
-async def generate_player_summary(player_name: str, stats_data: dict = None) -> str:
-    """Generate an entertaining player summary in Hinglish."""
+async def generate_player_summary(player_name: str, stats_data: dict = None, live_context: str = "") -> str:
+    """Generate an entertaining player summary with live web data."""
+    from datetime import datetime
+    today = datetime.now().strftime("%B %d, %Y")
+    
     stats_context = ""
     if stats_data:
         stats_context = f"\nPLAYER DATA:\n{str(stats_data)}"
+    
+    web_section = ""
+    if live_context:
+        web_section = f"""\n\n--- LIVE WEB SEARCH (latest news, recent performances) ---
+{live_context}
+--- END ---\n"""
 
     prompt = f"""Give an entertaining Hinglish summary of this cricket player:
 
+TODAY'S DATE: {today}
 PLAYER: {player_name}
 {stats_context}
-
+{web_section}
 YOUR TASK:
 1. Quick intro — kaun hai yeh banda?
-2. Key stats highlights — runs, wickets, best performances
+2. Key stats highlights — runs, wickets, best performances (use search data!)
 3. Playing style — kaise khelte hain?
-4. Current form — abhi ka form kaisa hai?
-5. Fun fact or iconic moment
-6. Your verdict — "Mera take hai..."
+4. CURRENT FORM — abhi ka form kaisa hai? Use RECENT match data from search!
+5. Latest news — any injuries, milestones, controversies?
+6. Fun fact or iconic moment
+7. Your verdict — "Mera take hai..."
 
-Keep it under 200 words, entertaining, and in Hinglish!"""
+Keep it under 250 words, entertaining, and in Hinglish!"""
 
     return await _generate(prompt)
 
 
-async def generate_h2h_analysis(team1: str, team2: str, match_data: dict = None) -> str:
-    """Generate head-to-head analysis between two teams."""
+async def generate_h2h_analysis(team1: str, team2: str, match_data: dict = None, live_context: str = "") -> str:
+    """Generate head-to-head analysis with live web data."""
+    from datetime import datetime
+    today = datetime.now().strftime("%B %d, %Y")
+    
     match_context = ""
     if match_data:
         match_context = f"\nCURRENT MATCH DATA:\n{_format_match_for_prompt(match_data)}"
+    
+    web_section = ""
+    if live_context:
+        web_section = f"""\n\n--- LIVE WEB SEARCH (recent results, H2H stats, form) ---
+{live_context}
+--- END ---\n"""
 
     prompt = f"""Give a detailed HEAD-TO-HEAD analysis for:
 
+TODAY'S DATE: {today}
 ⚔️ {team1} vs {team2}
 {match_context}
-
+{web_section}
 YOUR TASK:
-1. Historical H2H record — kitne matches, kaun kitne jeeta?
-2. Recent form — last 5 matches mein kaun better?
+1. Historical H2H record — kitne matches, kaun kitne jeeta? (use REAL stats from search!)
+2. Recent form — IPL 2026 mein kaun better? Use ACTUAL recent results!
 3. Key player battles — konse players ka matchup exciting hai?
 4. Venue factor — agar venue pata hai toh
 5. X-factor — kaun sa player match winner ban sakta hai?
@@ -208,35 +255,45 @@ YOUR TASK:
 FORMAT:
 ⚔️ {team1} vs {team2} — Head to Head
 
-📊 Overall Record: [summary]
-🔥 Recent Form: [analysis]
+📊 Overall Record: [summary with real numbers]
+🔥 Recent Form: [IPL 2026 form with real results]
 🎯 Key Battles: [matchups]
 🏟️ Venue Factor: [if applicable]
 ⚡ X-Factor: [game changer]
-🏏 Verdict: [your take]
+🏏 Verdict: [your confident take]
 
 Keep it under 300 words, exciting Hinglish!"""
 
     return await _generate(prompt)
 
 
-async def generate_player_comparison(player1: str, player2: str, stats1: dict = None, stats2: dict = None) -> str:
-    """Generate side-by-side player comparison."""
+async def generate_player_comparison(player1: str, player2: str, stats1: dict = None, stats2: dict = None, live_context: str = "") -> str:
+    """Generate side-by-side player comparison with live web data."""
+    from datetime import datetime
+    today = datetime.now().strftime("%B %d, %Y")
+    
     context1 = f"\n{player1} DATA:\n{str(stats1)}" if stats1 else ""
     context2 = f"\n{player2} DATA:\n{str(stats2)}" if stats2 else ""
+    
+    web_section = ""
+    if live_context:
+        web_section = f"""\n\n--- LIVE WEB SEARCH (recent performances, IPL 2026 stats) ---
+{live_context}
+--- END ---\n"""
 
     prompt = f"""Compare these two cricket players side-by-side:
 
+TODAY'S DATE: {today}
 🔄 {player1.title()} vs {player2.title()}
 {context1}
 {context2}
-
+{web_section}
 YOUR TASK:
 1. Quick intro of both players
-2. Stats comparison — batting avg, SR, runs, wickets (whatever applies)
+2. Stats comparison — use REAL IPL 2026 stats from search results!
 3. Playing style comparison — kaise different hain dono?
 4. Big match performance — pressure mein kaun better?
-5. Current form — abhi kaun zyada on fire?
+5. Current form — abhi kaun zyada on fire? (use RECENT match data!)
 6. Fun fact about their rivalry/friendship
 7. VERDICT — "Winner hai..." (pick one with reasoning)
 
@@ -246,15 +303,15 @@ FORMAT:
 👤 Player 1: [quick intro]
 👤 Player 2: [quick intro]
 
-📊 Stats Face-Off:
-  [comparison table/list]
+📊 Stats Face-Off (IPL 2026):
+  [comparison with real numbers]
 
 🎯 Style: [comparison]
 💪 Pressure: [who's better]
-🔥 Current Form: [who's hotter]
-🏆 Verdict: [pick winner]
+🔥 Current Form: [who's hotter with real data]
+🏆 Verdict: [pick winner boldly]
 
-Keep it under 300 words, Hinglish, and be bold with your verdict!"""
+Keep it under 300 words, Hinglish, and be bold!"""
 
     return await _generate(prompt)
 

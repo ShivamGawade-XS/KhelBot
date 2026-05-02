@@ -59,8 +59,12 @@ async def compare_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     await safe_reply(update, 
-        f"🔄 {player1_name.title()} vs {player2_name.title()} ka comparison prepare kar raha hoon... 🧠⏳"
+        f"🔄 {player1_name.title()} vs {player2_name.title()} ka comparison prepare kar raha hoon... 🔍🧠"
     )
+
+    # Search the web for latest player performances
+    from services.web_search import search_web
+    live_context = await search_web(f"{player1_name} vs {player2_name} IPL 2026 stats comparison")
 
     # Fetch stats for both players
     stats1 = await get_player_stats(player1_name)
@@ -76,7 +80,7 @@ async def compare_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await safe_reply(update, f"😕 '{player2_name}' nahi mila. Spelling check karo!")
         return
 
-    comparison = await generate_player_comparison(player1_name, player2_name, stats1, stats2)
+    comparison = await generate_player_comparison(player1_name, player2_name, stats1, stats2, live_context=live_context)
 
     if len(comparison) > 4000:
         mid = len(comparison) // 2

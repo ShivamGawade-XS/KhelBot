@@ -61,13 +61,17 @@ async def predict_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
         return
 
-    await safe_reply(update, f"🔮 {team1} vs {team2} ka prediction generate kar raha hoon... ⏳")
+    await safe_reply(update, f"🔮 {team1} vs {team2} ka prediction generate kar raha hoon... 🔍🧠")
+
+    # Search the web for latest form, injuries, pitch reports
+    from services.web_search import search_match_info
+    live_context = await search_match_info(team1, team2)
 
     match_data = await get_match_by_team(team1)
     if not match_data:
         match_data = await get_match_by_team(team2)
 
-    prediction = await generate_prediction(team1, team2, match_data)
+    prediction = await generate_prediction(team1, team2, match_data, live_context=live_context)
 
     try:
         match_id = match_data.get("id", f"{team1}_vs_{team2}") if match_data else f"{team1}_vs_{team2}"
