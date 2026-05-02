@@ -36,6 +36,7 @@ from handlers.trending import trending_command
 from handlers.callbacks import button_callback
 from handlers.chat import chat_handler
 from utils.logger import setup_logger
+from utils.keep_alive import keep_alive
 
 log = setup_logger("main")
 
@@ -149,6 +150,10 @@ def main() -> None:
         log.info("✅ Reminder scheduler set up")
     except Exception as e:
         log.warning(f"⚠️ Reminder scheduler failed (non-critical): {e}")
+
+    # ── Keep Alive Server ──────────────────────────────────
+    log.info("🌐 Starting keep-alive web server...")
+    keep_alive()
 
     # ── Start Polling ─────────────────────────────────────
     log.info("🚀 KhelBot V3 is live! Polling for updates...")

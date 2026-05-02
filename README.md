@@ -221,7 +221,7 @@ python -m pytest tests/ -v
 
 The `Procfile` is already configured:
 ```
-web: python main.py
+worker: python main.py
 ```
 
 ---
