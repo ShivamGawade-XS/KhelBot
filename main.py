@@ -160,7 +160,7 @@ def main() -> None:
     log.info(f"📋 {len(commands)} commands + chat + callbacks")
     log.info("Press Ctrl+C to stop")
     
-    app.run_polling(allowed_updates=["message", "callback_query"])
+    app.run_polling(allowed_updates=["message", "callback_query"], drop_pending_updates=True)
 
 
 if __name__ == "__main__":
