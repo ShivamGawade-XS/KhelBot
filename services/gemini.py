@@ -28,6 +28,8 @@ RULES:
 7. Always respond in a way that makes the user feel like they're chatting with a knowledgeable cricket buddy.
 8. When data is unavailable, be honest and say "Data nahi mila bhai" instead of making stuff up.
 9. IMPORTANT: Do NOT use markdown special characters like * or _ in your responses. Use plain text with emojis for formatting.
+10. When LIVE WEB SEARCH RESULTS are provided, ALWAYS use them as your primary source of truth. Base your answer on the search results, not your training data. Cite specific facts from the search results.
+11. Today's date is provided in the prompt. Use it to understand what is "current" and "recent".
 """
 
 # ── Hinglish Error Fallbacks ──────────────────────────────
@@ -257,21 +259,33 @@ Keep it under 300 words, Hinglish, and be bold with your verdict!"""
     return await _generate(prompt)
 
 
-async def generate_freeform_answer(question: str) -> str:
-    """Generate a free-form answer to any cricket question."""
-    prompt = f"""A cricket fan is asking you a question. Answer it like a knowledgeable Hinglish cricket buddy:
+async def generate_freeform_answer(question: str, live_context: str = "") -> str:
+    """Generate a free-form answer to any cricket question, optionally with live web context."""
+    from datetime import datetime
+    today = datetime.now().strftime("%B %d, %Y")
+    
+    web_section = ""
+    if live_context:
+        web_section = f"""\n\n--- LIVE WEB SEARCH RESULTS (use these as PRIMARY source!) ---
+{live_context}
+--- END OF SEARCH RESULTS ---\n"""
+    
+    prompt = f"""A cricket fan is asking you a question. Answer it like a knowledgeable Hinglish cricket buddy.
+
+TODAY'S DATE: {today}
 
 QUESTION: {question}
-
+{web_section}
 YOUR TASK:
-1. Answer the question accurately with cricket knowledge
-2. Add interesting facts or context if relevant
-3. If it's about records/stats, try to be as accurate as possible
-4. If you're not sure about exact numbers, say so honestly
+1. Answer the question accurately — if web search results are provided, USE THEM as your primary source
+2. Include specific details, dates, names, and numbers from the search results
+3. Add interesting facts or context if relevant
+4. If it's about schedules/scores/news, provide the LATEST info from search results
 5. Keep the Hinglish tone — fun, casual, but informative
 6. If the question is NOT about cricket/sports, politely redirect: "Bhai main cricket expert hoon, cricket ke baare mein poocho!"
+7. NEVER say "data nahi mila" or "schedule announce nahi hua" if search results clearly contain the answer!
 
-Keep it under 250 words!"""
+Keep it under 300 words!"""
 
     return await _generate(prompt)
 
@@ -379,17 +393,28 @@ Keep it under 250 words, exciting Hinglish!"""
     return await _generate(prompt)
 
 
-async def generate_trending(headlines: list = None) -> str:
+async def generate_trending(headlines: list = None, live_context: str = "") -> str:
     """Generate trending cricket topics analysis."""
+    from datetime import datetime
+    today = datetime.now().strftime("%B %d, %Y")
+    
     context = ""
     if headlines:
         context = "\nCURRENT HEADLINES:\n" + "\n".join(f"- {h}" for h in headlines if h)
+    
+    web_section = ""
+    if live_context:
+        web_section = f"""\n\n--- LIVE WEB SEARCH RESULTS ---
+{live_context}
+--- END OF SEARCH RESULTS ---\n"""
 
     prompt = f"""What's TRENDING in cricket right now? Analyze the current cricket scene:
-{context}
 
+TODAY'S DATE: {today}
+{context}
+{web_section}
 YOUR TASK:
-1. Top 3-5 trending topics in cricket right now
+1. Top 3-5 trending topics in cricket right now based on the LIVE search results and headlines
 2. For each topic — ek line summary + why it matters
 3. Hot takes — tumhara opinion on each
 4. One bold prediction about what will happen next
@@ -413,7 +438,7 @@ Keep it under 300 words, Hinglish, entertaining!"""
 
 
 def _format_match_for_prompt(match_data: dict) -> str:
-    """Format match data into a clean string for Gemini prompts."""
+    """Format match data into a clean string for AI prompts."""
     if not match_data:
         return "No match data available"
 

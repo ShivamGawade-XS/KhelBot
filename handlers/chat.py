@@ -1,12 +1,14 @@
 """
 KhelBot Natural Language Handler — Respond to plain text cricket queries.
 If a user sends a message without a command, KhelBot tries to understand it.
+Now with live web search for real-time answers!
 """
 
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from services.gemini import generate_freeform_answer
+from services.web_search import search_web
 from database.users import update_user_query_count
 from utils.validators import sanitize_input, extract_team_from_args
 from utils.reply import safe_reply
@@ -23,11 +25,13 @@ CRICKET_KEYWORDS = [
     "virat", "sachin", "tendulkar", "gavaskar", "kapil", "dravid",
     "t20", "odi", "test", "world cup", "ashes", "bcci", "trophy",
     "dream11", "fantasy", "predict", "kaun jeetega", "live", "stats",
+    "schedule", "points table", "orange cap", "purple cap", "auction",
+    "playoff", "final", "semi final", "qualifier",
 ]
 
 
 async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle plain text messages — natural language cricket chat."""
+    """Handle plain text messages — natural language cricket chat with web search."""
     if not update.message or not update.message.text:
         return
 
@@ -68,7 +72,9 @@ async def chat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await safe_reply(update, f"Score chahiye? Try karo: `/live {words[0]}`", parse_mode="Markdown")
         return
 
-    # Free-form AI answer
+    # Search the web for real-time context, then get AI answer
     question = sanitize_input(text)
-    answer = await generate_freeform_answer(question)
+    live_context = await search_web(question)
+    answer = await generate_freeform_answer(question, live_context=live_context)
     await safe_reply(update, answer, parse_mode="Markdown")
+
