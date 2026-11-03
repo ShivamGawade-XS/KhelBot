@@ -1,5 +1,6 @@
 """
 KhelBot /funfact Handler — Random cricket fun facts via AI + web search.
+Grounds fun facts with real web search results and applies rate limiting.
 """
 
 import random
@@ -8,7 +9,8 @@ from telegram.ext import ContextTypes
 
 from services.gemini import generate_funfact
 from services.web_search import search_web
-from database.users import update_user_query_count
+from database.users import async_update_user_query_count
+from utils.rate_limiter import rate_limiter
 from utils.reply import safe_reply
 from utils.logger import setup_logger
 
@@ -39,12 +41,16 @@ LOADING_MESSAGES = [
 async def funfact_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /funfact command — random cricket fun fact with web search."""
     user = update.effective_user
-    log.info(f"/funfact from {user.id}")
+    if not user:
+        return
 
-    try:
-        update_user_query_count(user.id)
-    except Exception:
-        pass
+    allowed, block_msg = rate_limiter.check(user.id)
+    if not allowed:
+        await safe_reply(update, block_msg)
+        return
+
+    log.info(f"/funfact from {user.id}")
+    await async_update_user_query_count(user.id)
 
     await safe_reply(update, random.choice(LOADING_MESSAGES))
 
@@ -52,6 +58,6 @@ async def funfact_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     topic = random.choice(FUNFACT_TOPICS)
     live_context = await search_web(topic)
 
-    fact = await generate_funfact()
+    # Pass live_context into generator
+    fact = await generate_funfact(live_context=live_context)
     await safe_reply(update, fact, parse_mode="Markdown")
-

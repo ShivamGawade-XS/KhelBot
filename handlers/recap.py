@@ -1,5 +1,5 @@
 """
-KhelBot /recap Handler — AI-generated match recap/summary.
+KhelBot /recap Handler — AI-generated match recap/summary with live search.
 """
 
 from telegram import Update
@@ -7,8 +7,9 @@ from telegram.ext import ContextTypes
 
 from services.cricapi import get_match_by_team, get_all_matches
 from services.gemini import generate_match_recap
-from database.users import update_user_query_count
+from database.users import async_update_user_query_count
 from utils.validators import extract_team_from_args
+from utils.rate_limiter import rate_limiter
 from utils.reply import safe_reply
 from utils.logger import setup_logger
 
@@ -20,12 +21,16 @@ async def recap_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     user = update.effective_user
     args = context.args
 
-    log.info(f"/recap from {user.id} | args: {args}")
+    if not user:
+        return
 
-    try:
-        update_user_query_count(user.id)
-    except Exception:
-        pass
+    allowed, block_msg = rate_limiter.check(user.id)
+    if not allowed:
+        await safe_reply(update, block_msg)
+        return
+
+    log.info(f"/recap from {user.id} | args: {args}")
+    await async_update_user_query_count(user.id)
 
     if not args:
         await safe_reply(update, "📝 Kaunsi team ka match recap chahiye?\n\n"
@@ -52,7 +57,6 @@ async def recap_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     match_data = await get_match_by_team(team_name)
 
     if not match_data:
-        # Try from all matches
         all_matches = await get_all_matches()
         team_lower = team_name.lower()
         for m in reversed(all_matches):
@@ -68,10 +72,4 @@ async def recap_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     recap = await generate_match_recap(match_data, live_context=live_context)
-
-    if len(recap) > 4000:
-        mid = len(recap) // 2
-        await safe_reply(update, recap[:mid], parse_mode="Markdown")
-        await safe_reply(update, recap[mid:], parse_mode="Markdown")
-    else:
-        await safe_reply(update, recap, parse_mode="Markdown")
+    await safe_reply(update, recap, parse_mode="Markdown")

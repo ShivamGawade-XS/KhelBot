@@ -7,9 +7,10 @@ from telegram.ext import ContextTypes
 
 from services.cricapi import get_player_stats
 from services.gemini import generate_player_summary
-from database.users import update_user_query_count
+from database.users import async_update_user_query_count
 from utils.formatters import format_player_stats
 from utils.validators import sanitize_input
+from utils.rate_limiter import rate_limiter
 from utils.reply import safe_reply
 from utils.logger import setup_logger
 
@@ -21,12 +22,16 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     user = update.effective_user
     args = context.args
 
-    log.info(f"/stats from {user.id} | args: {args}")
+    if not user:
+        return
 
-    try:
-        update_user_query_count(user.id)
-    except Exception:
-        pass
+    allowed, block_msg = rate_limiter.check(user.id)
+    if not allowed:
+        await safe_reply(update, block_msg)
+        return
+
+    log.info(f"/stats from {user.id} | args: {args}")
+    await async_update_user_query_count(user.id)
 
     if not args:
         await safe_reply(update, "📊 Kaunse player ka stats chahiye?\n\n"
@@ -63,9 +68,4 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     ai_summary = await generate_player_summary(player_name, player_data, live_context=live_context)
 
     response = f"{stats_text}\n\n━━━━━━━━━━━━━━━━━━━━━━\n\n🤖 **KhelBot ka Take:**\n\n{ai_summary}"
-
-    if len(response) > 4000:
-        await safe_reply(update, stats_text, parse_mode="Markdown")
-        await safe_reply(update, f"🤖 **KhelBot ka Take:**\n\n{ai_summary}", parse_mode="Markdown")
-    else:
-        await safe_reply(update, response, parse_mode="Markdown")
+    await safe_reply(update, response, parse_mode="Markdown")

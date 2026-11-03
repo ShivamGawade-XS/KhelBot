@@ -1,5 +1,6 @@
 """
 KhelBot /live Handler — Live score with AI-powered Hinglish context.
+Includes rate limiting, async non-blocking execution, and automatic message chunking.
 """
 
 from telegram import Update
@@ -7,9 +8,10 @@ from telegram.ext import ContextTypes
 
 from services.cricapi import get_match_by_team, get_live_matches
 from services.gemini import generate_live_context
-from database.users import update_user_query_count
+from database.users import async_update_user_query_count
 from utils.validators import extract_team_from_args
 from utils.formatters import format_score, format_match_list
+from utils.rate_limiter import rate_limiter
 from utils.reply import safe_reply
 from utils.logger import setup_logger
 
@@ -21,12 +23,16 @@ async def live_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user = update.effective_user
     args = context.args
 
-    log.info(f"/live from {user.id} | args: {args}")
+    if not user:
+        return
 
-    try:
-        update_user_query_count(user.id)
-    except Exception:
-        pass
+    allowed, block_msg = rate_limiter.check(user.id)
+    if not allowed:
+        await safe_reply(update, block_msg)
+        return
+
+    log.info(f"/live from {user.id} | args: {args}")
+    await async_update_user_query_count(user.id)
 
     if not args:
         await safe_reply(update, 
@@ -71,9 +77,4 @@ async def live_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     ai_context = await generate_live_context(match_data)
 
     response = f"{scorecard}\n\n━━━━━━━━━━━━━━━━━━━━━━\n\n🤖 **KhelBot ka Take:**\n\n{ai_context}"
-
-    if len(response) > 4000:
-        await safe_reply(update, scorecard, parse_mode="Markdown")
-        await safe_reply(update, f"🤖 **KhelBot ka Take:**\n\n{ai_context}", parse_mode="Markdown")
-    else:
-        await safe_reply(update, response, parse_mode="Markdown")
+    await safe_reply(update, response, parse_mode="Markdown")

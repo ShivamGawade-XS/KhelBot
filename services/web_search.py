@@ -1,30 +1,50 @@
 """
 KhelBot Web Search Service — Real-time internet search for live cricket data.
-Uses DuckDuckGo Search (ddgs) for free, unlimited web queries.
+Uses DuckDuckGo Search (ddgs) with multi-level TTL caching and error resilience.
 """
 
+import hashlib
 import asyncio
-from typing import Optional
+from typing import Optional, List
+from services.cache import cache
 from utils.logger import setup_logger
 
 log = setup_logger("web_search")
 
+SEARCH_CACHE_TTL = 900  # 15 minutes cache for web queries
+
+
+def _cache_key(query: str) -> str:
+    hash_str = hashlib.md5(query.strip().lower().encode()).hexdigest()[:10]
+    return f"search:{hash_str}"
+
 
 async def search_web(query: str, max_results: int = 5) -> str:
     """
-    Search the web for a cricket-related query and return formatted context.
-    Runs the synchronous DDGS in a thread to keep the bot async.
+    Search the web for a cricket query with TTL caching.
+    Runs synchronous search in a thread to keep the asyncio event loop responsive.
     """
+    clean_query = query.strip()
+    if not clean_query:
+        return ""
+
+    key = _cache_key(clean_query)
+    cached = cache.get(key)
+    if cached is not None:
+        log.debug(f"Search cache HIT for: '{clean_query[:35]}...'")
+        return cached
+
     try:
-        # Run synchronous ddgs search in a thread pool
-        loop = asyncio.get_event_loop()
-        results = await loop.run_in_executor(None, _sync_search, query, max_results)
+        loop = asyncio.get_running_loop()
+        results = await asyncio.wait_for(
+            loop.run_in_executor(None, _sync_search, clean_query, max_results),
+            timeout=8.0
+        )
 
         if not results:
-            log.warning(f"No web results for: {query}")
+            log.warning(f"No web results returned for: '{clean_query[:35]}...'")
             return ""
 
-        # Format results into a clean context block
         context_parts = []
         for i, r in enumerate(results, 1):
             title = r.get("title", "").strip()
@@ -33,29 +53,33 @@ async def search_web(query: str, max_results: int = 5) -> str:
             if title and body:
                 context_parts.append(f"{i}. {title}\n   {body}\n   Source: {href}")
 
-        if not context_parts:
-            return ""
-
         context = "\n\n".join(context_parts)
-        log.info(f"Web search for '{query[:40]}...' returned {len(context_parts)} results")
-        return context
+        if context:
+            cache.set(key, context, ttl=SEARCH_CACHE_TTL)
+            log.info(f"Web search for '{clean_query[:35]}...' returned {len(context_parts)} results (cached)")
 
+        return context
+    except asyncio.TimeoutError:
+        log.warning(f"Web search timed out for: '{clean_query[:35]}...'")
+        return ""
     except Exception as e:
-        log.error(f"Web search error: {e}")
+        log.error(f"Web search unexpected error: {e}")
         return ""
 
 
 def _sync_search(query: str, max_results: int) -> list:
-    """Synchronous wrapper for ddgs search."""
+    """Synchronous wrapper for ddgs search with fallback."""
     try:
         from ddgs import DDGS
+        # Append 'cricket' keyword if not present to ensure sports relevance
+        search_term = query if "cricket" in query.lower() or "ipl" in query.lower() else f"{query} cricket"
         results = DDGS().text(
-            query=f"{query} cricket",
+            query=search_term,
             max_results=max_results
         )
-        return results
+        return list(results) if results else []
     except Exception as e:
-        log.error(f"DDGS search error: {e}")
+        log.warning(f"DDGS search execution failed: {e}")
         return []
 
 
@@ -71,7 +95,7 @@ async def search_ipl_info(query: str) -> str:
 
 async def search_player_info(player_name: str) -> str:
     """Search for latest info about a specific cricket player."""
-    return await search_web(f"{player_name} cricket 2026 latest", max_results=4)
+    return await search_web(f"{player_name} cricket 2026 latest news form", max_results=4)
 
 
 async def search_match_info(team1: str, team2: str = "") -> str:

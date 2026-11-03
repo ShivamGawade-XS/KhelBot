@@ -8,7 +8,7 @@ import traceback
 from telegram import Update, BotCommand
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler,
-    MessageHandler, ContextTypes, filters
+    MessageHandler, InlineQueryHandler, ContextTypes, filters
 )
 
 from config.settings import TELEGRAM_BOT_TOKEN
@@ -40,6 +40,11 @@ from handlers.pitch import pitch_command
 from handlers.playing11 import playing11_command
 from handlers.callbacks import button_callback
 from handlers.chat import chat_handler
+from handlers.voice import voice_handler
+from handlers.inline import inline_query_handler
+from services.cricapi import get_all_matches
+from database.predictions import resolve_predictions_from_matches
+from utils.reply import safe_reply
 from utils.logger import setup_logger
 from utils.keep_alive import keep_alive
 
@@ -87,14 +92,27 @@ async def post_init(application: Application) -> None:
         log.warning(f"⚠️ Failed to set bot commands: {e}")
 
 
+async def sync_prediction_results_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Periodic job to resolve predictions against completed matches."""
+    try:
+        matches = await get_all_matches()
+        if matches:
+            resolved = resolve_predictions_from_matches(matches)
+            if resolved > 0:
+                log.info(f"✅ Prediction sync job resolved {resolved} predictions")
+    except Exception as e:
+        log.debug(f"Prediction sync job notice: {e}")
+
+
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Global error handler — catches all unhandled exceptions."""
+    """Global error handler — catches all unhandled exceptions gracefully."""
     log.error(f"Exception while handling update: {context.error}")
     log.error(traceback.format_exc())
 
-    if isinstance(update, Update) and update.effective_message:
+    if isinstance(update, Update):
         try:
-            await update.effective_message.reply_text(
+            await safe_reply(
+                update,
                 "😅 Oops! Kuch gadbad ho gayi mere end pe.\n"
                 "Thodi der mein phir se try karo bhai! 🏏"
             )
@@ -106,7 +124,7 @@ def main() -> None:
     """Initialize and start the KhelBot."""
     
     log.info("=" * 50)
-    log.info("🏏 KhelBot V4 starting up...")
+    log.info("🏏 KhelBot V4 starting up (Production Grade)...")
     log.info("=" * 50)
 
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
@@ -151,6 +169,16 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(button_callback))
     log.info("✅ Callback query handler registered")
 
+    # ── Register Inline Query Handler (@khelbot in any chat) ─
+    app.add_handler(InlineQueryHandler(inline_query_handler))
+    log.info("✅ Inline query handler registered")
+
+    # ── Register Voice & Audio Handler (Whisper V3) ───────
+    app.add_handler(MessageHandler(
+        filters.VOICE | filters.AUDIO, voice_handler
+    ))
+    log.info("✅ Voice note audio handler registered")
+
     # ── Register Natural Language Handler ─────────────────
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND, chat_handler
@@ -161,12 +189,23 @@ def main() -> None:
     app.add_error_handler(error_handler)
     log.info("✅ Global error handler registered")
 
-    # ── Set Up Reminder Scheduler ─────────────────────────
+    # ── Set Up Reminder & Prediction Sync Schedulers ──────
     try:
         setup_reminder_job(app)
         log.info("✅ Reminder scheduler set up")
     except Exception as e:
         log.warning(f"⚠️ Reminder scheduler failed (non-critical): {e}")
+
+    try:
+        app.job_queue.run_repeating(
+            sync_prediction_results_job,
+            interval=3600,  # Run every hour
+            first=60,
+            name="prediction_sync"
+        )
+        log.info("✅ Prediction sync scheduler set up")
+    except Exception as e:
+        log.warning(f"⚠️ Prediction sync scheduler failed: {e}")
 
     # ── Keep Alive Server ──────────────────────────────────
     log.info("🌐 Starting keep-alive web server...")
@@ -174,12 +213,11 @@ def main() -> None:
 
     # ── Start Polling ─────────────────────────────────────
     log.info("🚀 KhelBot V4 is live! Polling for updates...")
-    log.info(f"📋 {len(commands)} commands + chat + callbacks")
+    log.info(f"📋 {len(commands)} commands + voice + inline + chat + callbacks")
     log.info("Press Ctrl+C to stop")
     
-    app.run_polling(allowed_updates=["message", "callback_query"], drop_pending_updates=True)
+    app.run_polling(allowed_updates=["message", "callback_query", "inline_query"], drop_pending_updates=True)
 
 
 if __name__ == "__main__":
     main()
-

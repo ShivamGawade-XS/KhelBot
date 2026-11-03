@@ -1,24 +1,27 @@
 """
-KhelBot Cache — Lightweight in-memory TTL cache.
-No Redis needed — sufficient for <100 concurrent users with ephemeral sports data.
+KhelBot Cache — Production-grade thread-safe in-memory TTL cache with LRU eviction.
+Handles high concurrency, prevents unbounded memory growth, and avoids thread contention.
 """
 
 import time
+import threading
 from typing import Any, Optional
 
 
 class TTLCache:
     """
-    Simple in-memory cache with per-key TTL expiration.
+    Thread-safe in-memory cache with per-key TTL expiration and bounded capacity.
     
     Usage:
-        cache = TTLCache()
+        cache = TTLCache(max_size=2000)
         cache.set("live:rcb", data, ttl=60)
         result = cache.get("live:rcb")  # Returns data or None if expired
     """
 
-    def __init__(self):
+    def __init__(self, max_size: int = 2000):
+        self._max_size = max_size
         self._store: dict[str, tuple[Any, float]] = {}
+        self._lock = threading.RLock()
 
     def get(self, key: str) -> Optional[Any]:
         """
@@ -30,54 +33,69 @@ class TTLCache:
         Returns:
             Cached value or None if missing/expired
         """
-        if key not in self._store:
-            return None
+        with self._lock:
+            if key not in self._store:
+                return None
 
-        value, expiry = self._store[key]
+            value, expiry = self._store[key]
 
-        if time.time() > expiry:
-            # Expired — clean up and return None
-            del self._store[key]
-            return None
+            if time.time() > expiry:
+                # Expired — clean up and return None
+                del self._store[key]
+                return None
 
-        return value
+            return value
 
     def set(self, key: str, value: Any, ttl: int) -> None:
         """
         Store a value with a TTL (time-to-live) in seconds.
+        Evicts expired or oldest entries if capacity exceeded.
         
         Args:
             key: Cache key
             value: Data to cache
             ttl: Time-to-live in seconds
         """
-        expiry = time.time() + ttl
-        self._store[key] = (value, expiry)
+        with self._lock:
+            # If at max capacity, run a quick cleanup of expired keys
+            if len(self._store) >= self._max_size and key not in self._store:
+                self.cleanup()
+                # If still at max capacity, evict the oldest key (FIFO/LRU fallback)
+                if len(self._store) >= self._max_size:
+                    oldest_key = next(iter(self._store))
+                    del self._store[oldest_key]
+
+            expiry = time.time() + ttl
+            self._store[key] = (value, expiry)
 
     def invalidate(self, key: str) -> None:
         """Remove a specific key from cache."""
-        self._store.pop(key, None)
+        with self._lock:
+            self._store.pop(key, None)
 
     def clear(self) -> None:
         """Clear all cached data."""
-        self._store.clear()
+        with self._lock:
+            self._store.clear()
 
     def cleanup(self) -> int:
         """
         Remove all expired entries. Returns count of removed entries.
-        Call periodically if memory is a concern.
+        Thread-safe iteration.
         """
-        now = time.time()
-        expired_keys = [k for k, (_, exp) in self._store.items() if now > exp]
-        for key in expired_keys:
-            del self._store[key]
-        return len(expired_keys)
+        with self._lock:
+            now = time.time()
+            expired_keys = [k for k, (_, exp) in list(self._store.items()) if now > exp]
+            for key in expired_keys:
+                self._store.pop(key, None)
+            return len(expired_keys)
 
     @property
     def size(self) -> int:
         """Number of entries in cache (including potentially expired ones)."""
-        return len(self._store)
+        with self._lock:
+            return len(self._store)
 
 
 # Singleton cache instance for the entire bot
-cache = TTLCache()
+cache = TTLCache(max_size=2000)

@@ -7,8 +7,9 @@ from telegram.ext import ContextTypes
 
 from services.cricapi import get_player_stats
 from services.gemini import generate_player_comparison
-from database.users import update_user_query_count
+from database.users import async_update_user_query_count
 from utils.validators import sanitize_input
+from utils.rate_limiter import rate_limiter
 from utils.reply import safe_reply
 from utils.logger import setup_logger
 
@@ -20,12 +21,16 @@ async def compare_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user = update.effective_user
     args = context.args
 
-    log.info(f"/compare from {user.id} | args: {args}")
+    if not user:
+        return
 
-    try:
-        update_user_query_count(user.id)
-    except Exception:
-        pass
+    allowed, block_msg = rate_limiter.check(user.id)
+    if not allowed:
+        await safe_reply(update, block_msg)
+        return
+
+    log.info(f"/compare from {user.id} | args: {args}")
+    await async_update_user_query_count(user.id)
 
     if not args:
         await safe_reply(update, "🔄 Kaunse players ko compare karna hai?\n\n"
@@ -81,10 +86,4 @@ async def compare_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     comparison = await generate_player_comparison(player1_name, player2_name, stats1, stats2, live_context=live_context)
-
-    if len(comparison) > 4000:
-        mid = len(comparison) // 2
-        await safe_reply(update, comparison[:mid], parse_mode="Markdown")
-        await safe_reply(update, comparison[mid:], parse_mode="Markdown")
-    else:
-        await safe_reply(update, comparison, parse_mode="Markdown")
+    await safe_reply(update, comparison, parse_mode="Markdown")

@@ -5,8 +5,9 @@ KhelBot /poll Handler — Create a match prediction poll in group chats.
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from database.users import update_user_query_count
+from database.users import async_update_user_query_count
 from utils.validators import extract_two_teams, extract_team_from_args
+from utils.rate_limiter import rate_limiter
 from utils.reply import safe_reply
 from utils.logger import setup_logger
 
@@ -18,12 +19,16 @@ async def poll_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user = update.effective_user
     args = context.args
 
-    log.info(f"/poll from {user.id} | args: {args}")
+    if not user:
+        return
 
-    try:
-        update_user_query_count(user.id)
-    except Exception:
-        pass
+    allowed, block_msg = rate_limiter.check(user.id)
+    if not allowed:
+        await safe_reply(update, block_msg)
+        return
+
+    log.info(f"/poll from {user.id} | args: {args}")
+    await async_update_user_query_count(user.id)
 
     if not args:
         await safe_reply(update, "📊 Kaunsi match ka poll banana hai?\n\n"
@@ -50,17 +55,19 @@ async def poll_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     # Create a native Telegram poll
     try:
-        await update.message.reply_poll(
-            question=f"🏏 {team1} vs {team2} — Kaun jeetega?",
-            options=[
-                f"🏆 {team1}",
-                f"🏆 {team2}",
-                "🤝 Tie / No Result",
-            ],
-            is_anonymous=False,
-            allows_multiple_answers=False,
-        )
-        log.info(f"Poll created: {team1} vs {team2}")
+        msg = update.effective_message or (update.callback_query.message if update.callback_query else None)
+        if msg:
+            await msg.reply_poll(
+                question=f"🏏 {team1} vs {team2} — Kaun jeetega?",
+                options=[
+                    f"🏆 {team1}",
+                    f"🏆 {team2}",
+                    "🤝 Tie / No Result",
+                ],
+                is_anonymous=False,
+                allows_multiple_answers=False,
+            )
+            log.info(f"Poll created: {team1} vs {team2}")
     except Exception as e:
         log.error(f"Poll creation error: {e}")
         await safe_reply(update, "😕 Poll bana nahi paya. Thodi der mein try karo!")

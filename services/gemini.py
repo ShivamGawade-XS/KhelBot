@@ -32,34 +32,69 @@ RULES:
 11. Today's date is provided in the prompt. Use it to understand what is "current" and "recent".
 """
 
+# Model fallback chain: primary high-capacity model, followed by ultra-fast 8B fallback
+MODEL_FALLBACKS = [GROQ_MODEL, "llama-3.1-8b-instant", "gemma2-9b-it"]
+
 # ── Hinglish Error Fallbacks ──────────────────────────────
 FALLBACK_ERROR = "Arre yaar, AI buddy abhi thoda busy hai 😅 Thodi der mein try karo!"
 FALLBACK_NO_DATA = "Bhai, data nahi mil raha abhi 🤷‍♂️ API wale chai break pe hain lagta hai!"
 
 
 async def _generate(prompt: str) -> str:
-    """Generate a response from Groq with error handling."""
-    try:
-        response = await _client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PERSONALITY},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=700,
-            top_p=0.95
-        )
-        
-        if response and response.choices:
-            return response.choices[0].message.content.strip()
-        
-        log.warning("Groq returned empty response")
-        return FALLBACK_ERROR
+    """Generate a response from Groq with multi-model fallback and timeout."""
+    import asyncio
+    
+    for model_name in MODEL_FALLBACKS:
+        try:
+            response = await asyncio.wait_for(
+                _client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PERSONALITY},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=700,
+                    top_p=0.95
+                ),
+                timeout=15.0
+            )
+            
+            if response and response.choices:
+                return response.choices[0].message.content.strip()
+            
+            log.warning(f"Groq returned empty response from {model_name}, trying next model")
+        except asyncio.TimeoutError:
+            log.warning(f"Groq generation timed out on {model_name}, trying next model")
+        except Exception as e:
+            log.warning(f"Groq error with model {model_name}: {e}. Retrying with fallback...")
 
+    log.error("All Groq model fallbacks exhausted.")
+    return FALLBACK_ERROR
+
+
+async def transcribe_audio_file(audio_bytes: bytes, filename: str = "voice.ogg") -> Optional[str]:
+    """
+    Transcribe audio/voice note bytes using Groq Whisper Large V3.
+    Supports Hindi, Hinglish, and English voice notes.
+    """
+    import asyncio
+    try:
+        transcription = await asyncio.wait_for(
+            _client.audio.transcriptions.create(
+                file=(filename, audio_bytes),
+                model="whisper-large-v3",
+                response_format="text"
+            ),
+            timeout=20.0
+        )
+        if transcription:
+            result_text = transcription if isinstance(transcription, str) else getattr(transcription, "text", "")
+            return result_text.strip()
+        return None
     except Exception as e:
-        log.error(f"Groq generation error: {e}")
-        return FALLBACK_ERROR
+        log.error(f"Whisper transcription failed: {e}")
+        return None
 
 
 async def generate_live_context(match_data: dict) -> str:
@@ -364,15 +399,19 @@ RESPOND IN EXACTLY THIS JSON FORMAT:
 Where "correct" is the index (0-3) of the correct option.
 IMPORTANT: Respond ONLY with valid JSON."""
 
+    import asyncio
     try:
-        response = await _client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PERSONALITY},
-                {"role": "user", "content": prompt}
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.7
+        response = await asyncio.wait_for(
+            _client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PERSONALITY},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.7
+            ),
+            timeout=15.0
         )
         
         if response and response.choices:

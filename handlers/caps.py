@@ -2,12 +2,14 @@
 KhelBot /orangecap & /purplecap Handlers — IPL cap race via live web search.
 """
 
+from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from services.web_search import search_web
 from services.gemini import generate_freeform_answer
-from database.users import update_user_query_count
+from database.users import async_update_user_query_count
+from utils.rate_limiter import rate_limiter
 from utils.reply import safe_reply
 from utils.logger import setup_logger
 
@@ -17,18 +19,20 @@ log = setup_logger("handler.caps")
 async def orangecap_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /orangecap command — IPL Orange Cap race."""
     user = update.effective_user
-    log.info(f"/orangecap from {user.id}")
+    if not user:
+        return
 
-    try:
-        update_user_query_count(user.id)
-    except Exception:
-        pass
+    allowed, block_msg = rate_limiter.check(user.id)
+    if not allowed:
+        await safe_reply(update, block_msg)
+        return
+
+    log.info(f"/orangecap from {user.id}")
+    await async_update_user_query_count(user.id)
 
     await safe_reply(update, "🧡 Orange Cap race dhundh raha hoon... 🔍")
 
     live_context = await search_web("IPL 2026 orange cap holder most runs list")
-
-    from datetime import datetime
     today = datetime.now().strftime("%B %d, %Y")
 
     prompt = f"""Show the IPL 2026 Orange Cap race (most runs scorers).
@@ -69,18 +73,20 @@ Use REAL numbers from search results! Hinglish mein bolo!"""
 async def purplecap_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /purplecap command — IPL Purple Cap race."""
     user = update.effective_user
-    log.info(f"/purplecap from {user.id}")
+    if not user:
+        return
 
-    try:
-        update_user_query_count(user.id)
-    except Exception:
-        pass
+    allowed, block_msg = rate_limiter.check(user.id)
+    if not allowed:
+        await safe_reply(update, block_msg)
+        return
+
+    log.info(f"/purplecap from {user.id}")
+    await async_update_user_query_count(user.id)
 
     await safe_reply(update, "💜 Purple Cap race dhundh raha hoon... 🔍")
 
     live_context = await search_web("IPL 2026 purple cap holder most wickets list")
-
-    from datetime import datetime
     today = datetime.now().strftime("%B %d, %Y")
 
     prompt = f"""Show the IPL 2026 Purple Cap race (most wickets takers).

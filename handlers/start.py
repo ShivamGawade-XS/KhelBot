@@ -1,51 +1,56 @@
 """
 KhelBot /start Handler — Onboarding and welcome message with inline keyboards.
+Non-blocking user registration and safe message delivery.
 """
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-from database.users import create_or_update_user
+from database.users import async_create_or_update_user
 from utils.reply import safe_reply
 from utils.logger import setup_logger
 
 log = setup_logger("handler.start")
 
-WELCOME_MESSAGE = """🏏 **Namaste! Main hoon KhelBot V3 — India ka apna LIVE cricket buddy!**
+WELCOME_MESSAGE = """🏏 **Namaste! Main hoon KhelBot V4 — India ka apna LIVE cricket buddy!**
 
-Mere paas ab **Real-Time Web Search** ki shakti hai! 🔥
-Main direct internet se live data, stats, aur news nikaal ke answers deta hoon!
+Mere paas ab **Real-Time Web Search** aur Llama 3.3 Intelligence ki shakti hai! 🔥
+Direct internet se live scores, stats, squads aur analysis nikaal ke answers deta hoon!
 
-🎯 **Naye Commands:**
+🎯 **Live & Matches:**
 /today — 📺 Aaj ke matches aur timings
-/orangecap — 🧡 Orange Cap race stats
-/purplecap — 💜 Purple Cap race stats
-
-🏆 **Match Action:**
-/live `<team>` — Live score + AI context
-/predict `<team1> vs <team2>` — Win prediction (Live form data)
-/dream11 `<team1> vs <team2>` — Fantasy team (Real squads)
+/live `<team>` — Live score + AI commentary
+/playing11 `<team>` — 📋 Playing 11 & Lineups
+/pitch `<match>` — 🏟️ Pitch & Weather report
 /remind `<team>` — Match reminder
 
-📊 **AI Analysis:**
-/stats `<player>` — Player stats + AI summary
-/h2h `<team1> vs <team2>` — Head-to-head analysis
+🔮 **AI Analysis & Fantasy:**
+/predict `<team1> vs <team2>` — Win prediction
+/dream11 `<team1> vs <team2>` — Fantasy team
+/h2h `<team1> vs <team2>` — Head-to-head records
 /compare `<p1> vs <p2>` — Player comparison
-/schedule `[team]` — Upcoming matches
+/stats `<player>` — Career statistics
 
-💬 **Chat & Fun:**
-/ask `<question>` — Ask anything (Web Search Enabled!)
-/news `[team]` — Cricket headlines
+🏆 **IPL Specials:**
+/points — 🏅 Points table
+/orangecap — 🧡 Orange Cap race
+/purplecap — 💜 Purple Cap race
+/schedule `[team]` — Upcoming fixtures
+
+💬 **Banter & Chat:**
+/ask `<question>` — Cricket ka koi bhi sawaal
+/roast `<team>` — Savage Hinglish roast 🔥
+/quiz — Trivia quiz (Inline buttons)
 /trending — Trending cricket topics
-/quiz — Cricket trivia quiz
+/news — Top cricket headlines
 
-❓ /help — Quick command list
+❓ /help — Sabhi commands ki list
 
 ━━━━━━━━━━━━━━━━━━━━━━
 📍 **Teams:** CSK, MI, RCB, KKR, DC, RR, SRH, PBKS, GT, LSG
-   Short names bhi chalega — `csk`, `mumbai`, `kohli`, etc.
+   Short names bhi chalenge — `csk`, `mumbai`, `kohli`, etc.
 
-_Ab bolo, aaj kya chal raha hai cricket ki duniya mein?_ 🏏🔥"""
+_Bolo bhai, aaj cricket mein kya chal raha hai?_ 🏏🔥"""
 
 
 def get_start_keyboard() -> InlineKeyboardMarkup:
@@ -73,20 +78,16 @@ def get_start_keyboard() -> InlineKeyboardMarkup:
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /start command — onboarding + user registration."""
     user = update.effective_user
-    
     if not user:
         return
 
     log.info(f"/start from {user.id} (@{user.username})")
 
-    # Register/update user in database
-    try:
-        create_or_update_user(
-            telegram_id=user.id,
-            username=user.username or user.first_name or ""
-        )
-    except Exception as e:
-        log.error(f"Failed to register user {user.id}: {e}")
+    # Non-blocking user registration
+    await async_create_or_update_user(
+        telegram_id=user.id,
+        username=user.username or user.first_name or ""
+    )
 
     await safe_reply(update, WELCOME_MESSAGE,
         parse_mode="Markdown", reply_markup=get_start_keyboard())

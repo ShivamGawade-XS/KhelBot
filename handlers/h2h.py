@@ -7,8 +7,9 @@ from telegram.ext import ContextTypes
 
 from services.cricapi import get_match_by_team
 from services.gemini import generate_h2h_analysis
-from database.users import update_user_query_count
+from database.users import async_update_user_query_count
 from utils.validators import extract_two_teams, extract_team_from_args
+from utils.rate_limiter import rate_limiter
 from utils.reply import safe_reply
 from utils.logger import setup_logger
 
@@ -20,12 +21,16 @@ async def h2h_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     user = update.effective_user
     args = context.args
 
-    log.info(f"/h2h from {user.id} | args: {args}")
+    if not user:
+        return
 
-    try:
-        update_user_query_count(user.id)
-    except Exception:
-        pass
+    allowed, block_msg = rate_limiter.check(user.id)
+    if not allowed:
+        await safe_reply(update, block_msg)
+        return
+
+    log.info(f"/h2h from {user.id} | args: {args}")
+    await async_update_user_query_count(user.id)
 
     if not args:
         await safe_reply(update, "⚔️ Kaunsi teams ka head-to-head chahiye?\n\n"
@@ -55,22 +60,12 @@ async def h2h_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     await safe_reply(update, f"⚔️ {team1} vs {team2} ka head-to-head analysis kar raha hoon... 🔍🧠")
 
-    # Search the web for real H2H stats and recent form
     from services.web_search import search_match_info
     live_context = await search_match_info(team1, team2)
 
-    # Fetch match data for additional context
     match_data = await get_match_by_team(team1)
     if not match_data:
         match_data = await get_match_by_team(team2)
 
     analysis = await generate_h2h_analysis(team1, team2, match_data, live_context=live_context)
-
-    response = f"{analysis}"
-
-    if len(response) > 4000:
-        mid = len(response) // 2
-        await safe_reply(update, response[:mid], parse_mode="Markdown")
-        await safe_reply(update, response[mid:], parse_mode="Markdown")
-    else:
-        await safe_reply(update, response, parse_mode="Markdown")
+    await safe_reply(update, analysis, parse_mode="Markdown")

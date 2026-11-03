@@ -1,14 +1,16 @@
 """
-KhelBot /quiz Handler — Cricket trivia quiz with inline keyboard buttons.
+KhelBot /quiz Handler — Cricket trivia quiz with secure inline keyboard buttons.
+Keeps the correct answer server-side in TTL cache to prevent client-side inspection.
 """
 
-import json
-import random
+import hashlib
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from services.gemini import generate_quiz_question
-from database.users import update_user_query_count
+from database.users import async_update_user_query_count
+from services.cache import cache
+from utils.rate_limiter import rate_limiter
 from utils.reply import safe_reply
 from utils.logger import setup_logger
 
@@ -18,13 +20,16 @@ log = setup_logger("handler.quiz")
 async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /quiz command — generate a cricket trivia question."""
     user = update.effective_user
+    if not user:
+        return
+
+    allowed, block_msg = rate_limiter.check(user.id)
+    if not allowed:
+        await safe_reply(update, block_msg)
+        return
 
     log.info(f"/quiz from {user.id}")
-
-    try:
-        update_user_query_count(user.id)
-    except Exception:
-        pass
+    await async_update_user_query_count(user.id)
 
     await safe_reply(update, "🧠 Cricket ka sawaal generate kar raha hoon... ⏳")
 
@@ -39,13 +44,15 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     correct = quiz_data.get("correct", 0)
     explanation = quiz_data.get("explanation", "")
 
-    # Create inline keyboard with options
+    # Generate a unique short quiz ID and store answer server-side
+    qid = hashlib.md5(f"{question}:{correct}".encode()).hexdigest()[:8]
+    cache.set(f"quiz:{qid}", {"correct": correct, "explanation": explanation}, ttl=600)
+
+    # Create inline keyboard without leaking correct answer index
     keyboard = []
     emojis = ["🅰️", "🅱️", "🅲", "🅳"]
     for i, option in enumerate(options[:4]):
-        callback_data = json.dumps({"type": "quiz", "correct": correct, "picked": i, "exp": explanation[:100]})
-        # Telegram limits callback_data to 64 bytes, so keep it short
-        short_data = f"quiz_{correct}_{i}"
+        short_data = f"q_{qid}_{i}"
         keyboard.append([InlineKeyboardButton(f"{emojis[i]} {option}", callback_data=short_data)])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -57,7 +64,3 @@ async def quiz_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
-
-    # Store explanation in context for callback
-    if context.user_data is not None:
-        context.user_data["quiz_explanation"] = explanation

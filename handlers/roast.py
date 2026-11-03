@@ -7,8 +7,9 @@ from telegram.ext import ContextTypes
 
 from services.web_search import search_web
 from services.gemini import generate_freeform_answer
-from database.users import update_user_query_count
+from database.users import async_update_user_query_count
 from utils.validators import sanitize_input
+from utils.rate_limiter import rate_limiter
 from utils.reply import safe_reply
 from utils.logger import setup_logger
 
@@ -20,12 +21,16 @@ async def roast_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     user = update.effective_user
     args = context.args
 
-    log.info(f"/roast from {user.id} | args: {args}")
+    if not user:
+        return
 
-    try:
-        update_user_query_count(user.id)
-    except Exception:
-        pass
+    allowed, block_msg = rate_limiter.check(user.id)
+    if not allowed:
+        await safe_reply(update, block_msg)
+        return
+
+    log.info(f"/roast from {user.id} | args: {args}")
+    await async_update_user_query_count(user.id)
 
     if not args:
         await safe_reply(update, "🔥 Kisko roast karna hai bhai?\n\n"

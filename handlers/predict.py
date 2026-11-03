@@ -1,16 +1,19 @@
 """
-KhelBot /predict Handler — AI-powered match win predictions.
-Always includes a mandatory disclaimer.
+KhelBot /predict Handler — AI-powered match win predictions with live context.
+Extracts true predicted winner and confidence, and logs non-blockingly to database.
+Always includes a mandatory responsible gaming disclaimer.
 """
 
+import re
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from services.cricapi import get_match_by_team
 from services.gemini import generate_prediction
-from database.users import update_user_query_count
-from database.predictions import log_prediction
+from database.users import async_update_user_query_count
+from database.predictions import async_log_prediction
 from utils.validators import extract_two_teams, extract_team_from_args
+from utils.rate_limiter import rate_limiter
 from utils.reply import safe_reply
 from utils.logger import setup_logger
 
@@ -23,17 +26,70 @@ DISCLAIMER = (
 )
 
 
+def _parse_winner_and_confidence(prediction_text: str, team1: str, team2: str) -> tuple[str, float]:
+    """
+    Parse the predicted winner and confidence percentage from the LLM text.
+    Returns (predicted_winner, confidence_pct).
+    """
+    pct1, pct2 = 50.0, 50.0
+    
+    # Try finding lines like: "TeamName: 65%" or "65% - TeamName"
+    lines = prediction_text.splitlines()
+    for line in lines:
+        line_clean = line.strip().lower()
+        if team1.lower() in line_clean:
+            match = re.search(r'(\d{1,3})\s*%', line_clean)
+            if match:
+                try:
+                    pct1 = float(match.group(1))
+                except ValueError:
+                    pass
+        if team2.lower() in line_clean:
+            match = re.search(r'(\d{1,3})\s*%', line_clean)
+            if match:
+                try:
+                    pct2 = float(match.group(1))
+                except ValueError:
+                    pass
+
+    if pct1 != pct2:
+        if pct1 > pct2:
+            return team1, pct1
+        else:
+            return team2, pct2
+
+    # Fallback: check Final Verdict section for team name mentions
+    verdict_section = ""
+    if "verdict" in prediction_text.lower():
+        verdict_section = prediction_text.lower().split("verdict")[-1]
+
+    t1_in_verdict = team1.lower() in verdict_section
+    t2_in_verdict = team2.lower() in verdict_section
+
+    if t2_in_verdict and not t1_in_verdict:
+        return team2, 55.0
+    if t1_in_verdict and not t2_in_verdict:
+        return team1, 55.0
+
+    return team1, 50.0
+
+
 async def predict_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle the /predict command — generate win prediction."""
     user = update.effective_user
     args = context.args
 
-    log.info(f"/predict from {user.id} | args: {args}")
+    if not user:
+        return
 
-    try:
-        update_user_query_count(user.id)
-    except Exception:
-        pass
+    # Check rate limiter
+    allowed, block_msg = rate_limiter.check(user.id)
+    if not allowed:
+        await safe_reply(update, block_msg)
+        return
+
+    log.info(f"/predict from {user.id} | args: {args}")
+    await async_update_user_query_count(user.id)
 
     if not args:
         await safe_reply(update, "🔮 Kaunsi teams ka prediction chahiye?\n\n"
@@ -73,21 +129,16 @@ async def predict_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     prediction = await generate_prediction(team1, team2, match_data, live_context=live_context)
 
-    try:
-        match_id = match_data.get("id", f"{team1}_vs_{team2}") if match_data else f"{team1}_vs_{team2}"
-        log_prediction(
-            match_id=str(match_id),
-            match_name=f"{team1} vs {team2}",
-            predicted_winner=team1,
-            confidence_pct=50.0,
-        )
-    except Exception as e:
-        log.error(f"Failed to log prediction: {e}")
+    # Extract true winner and confidence percentage
+    winner, confidence = _parse_winner_and_confidence(prediction, team1, team2)
+
+    match_id = match_data.get("id", f"{team1}_vs_{team2}") if match_data else f"{team1}_vs_{team2}"
+    await async_log_prediction(
+        match_id=str(match_id),
+        match_name=f"{team1} vs {team2}",
+        predicted_winner=winner,
+        confidence_pct=confidence,
+    )
 
     response = f"{prediction}{DISCLAIMER}"
-
-    if len(response) > 4000:
-        await safe_reply(update, prediction, parse_mode="Markdown")
-        await safe_reply(update, DISCLAIMER, parse_mode="Markdown")
-    else:
-        await safe_reply(update, response, parse_mode="Markdown")
+    await safe_reply(update, response, parse_mode="Markdown")
